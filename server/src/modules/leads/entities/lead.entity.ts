@@ -1,10 +1,12 @@
 // server/src/modules/leads/entities/lead.entity.ts
-import { Entity, Column, ManyToOne } from 'typeorm';
+import { Entity, Column, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { User } from '../../users/entities/user.entity';
+import { Note } from '../../notes/entities/note.entity';
 
 @Entity('leads')
 export class Lead extends BaseEntity {
+
   @Column()
   firstName: string;
 
@@ -21,7 +23,7 @@ export class Lead extends BaseEntity {
   company: string;
 
   @Column({ type: 'text', nullable: true })
-  notes: string;
+  notesText: string;
 
   @Column({ 
     type: 'enum', 

@@ -5,7 +5,7 @@ import { Notification } from '../entities/notification.entity';
 
 @Injectable()
 export class NotificationRepository extends Repository<Notification> {
-  constructor(private dataSource: DataSource) {
+  constructor(dataSource: DataSource) {
     super(Notification, dataSource.createEntityManager());
   }
 

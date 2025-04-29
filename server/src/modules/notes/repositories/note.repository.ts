@@ -5,7 +5,7 @@ import { Note } from '../entities/note.entity';
 
 @Injectable()
 export class NoteRepository extends Repository<Note> {
-  constructor(private dataSource: DataSource) {
+  constructor(dataSource: DataSource) {
     super(Note, dataSource.createEntityManager());
   }
 

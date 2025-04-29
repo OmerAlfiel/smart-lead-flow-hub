@@ -1,5 +1,4 @@
 // server/src/modules/users/dto/update-user.dto.ts
-import { PartialType } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, IsBoolean, IsEnum } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 

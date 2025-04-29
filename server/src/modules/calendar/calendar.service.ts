@@ -221,11 +221,11 @@ export class CalendarService {
     
     // Get lead name if available
     if (event.lead) {
-      leadName = event.lead.name;
+      leadName = `${event.lead.firstName} ${event.lead.lastName}`;
     } else if (event.leadId) {
       const lead = await this.leadRepository.findOne({ where: { id: event.leadId } });
       if (lead) {
-        leadName = lead.name;
+        leadName = `${lead.firstName} ${lead.lastName}`;
       }
     }
     

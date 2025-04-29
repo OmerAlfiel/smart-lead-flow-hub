@@ -5,7 +5,7 @@ import { Lead } from '../entities/lead.entity';
 
 @Injectable()
 export class LeadRepository extends Repository<Lead> {
-  constructor(private dataSource: DataSource) {
+  constructor(dataSource: DataSource) {
     super(Lead, dataSource.createEntityManager());
   }
 

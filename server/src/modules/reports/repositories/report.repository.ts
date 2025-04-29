@@ -5,7 +5,7 @@ import { Report, ReportStatus } from '../entities/report.entity';
 
 @Injectable()
 export class ReportRepository extends Repository<Report> {
-  constructor(private dataSource: DataSource) {
+  constructor(dataSource: DataSource) {
     super(Report, dataSource.createEntityManager());
   }
 

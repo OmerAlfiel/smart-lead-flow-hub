@@ -5,7 +5,7 @@ import { Team } from '../entities/team.entity';
 
 @Injectable()
 export class TeamRepository extends Repository<Team> {
-  constructor(private dataSource: DataSource) {
+  constructor(dataSource: DataSource) {
     super(Team, dataSource.createEntityManager());
   }
 
