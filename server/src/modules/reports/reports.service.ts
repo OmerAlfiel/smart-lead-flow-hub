@@ -14,9 +14,8 @@ import { v4 as uuidv4 } from 'uuid';
 @Injectable()
 export class ReportsService {
   constructor(
-    @InjectRepository(Report)
-    private reportsRepository: Repository<Report>,
-    private reportRepository: ReportRepository,
+    @InjectRepository(ReportRepository)
+    private reportsRepository: ReportRepository,
     private analyticsService: AnalyticsService,
   ) {}
 
@@ -44,7 +43,7 @@ export class ReportsService {
   }
 
   async findByUser(userId: string): Promise<Report[]> {
-    return this.reportRepository.findByUser(userId);
+    return this.reportsRepository.find({ where: { createdById: userId } });
   }
 
   async findOne(id: string): Promise<Report> {
@@ -146,7 +145,7 @@ export class ReportsService {
   }
 
   async processScheduledReports(): Promise<void> {
-    const scheduledReports = await this.reportRepository.findScheduledReports();
+    const scheduledReports = await this.reportsRepository.findScheduledReports();
     
     for (const report of scheduledReports) {
       await this.generateReport(report.id);

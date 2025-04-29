@@ -4,6 +4,7 @@ import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Campaign } from './entities/campaign.entity';
 
 @ApiTags('campaigns')
 @ApiBearerAuth()
@@ -22,7 +23,7 @@ export class CampaignsController {
   @Get()
   @ApiOperation({ summary: 'Get all campaigns' })
   @ApiResponse({ status: 200, description: 'Return all campaigns' })
-  findAll(@Query('status') status?: string) {
+  async findAll(@Query('status') status?: string): Promise<Campaign[]> {
     return this.campaignsService.findAll(status);
   }
 

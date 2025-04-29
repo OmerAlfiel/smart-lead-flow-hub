@@ -1,4 +1,4 @@
-import { Entity, Column, BeforeInsert } from 'typeorm';
+import { Entity, Column, BeforeInsert, OneToOne } from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import * as bcrypt from 'bcrypt';
 import { Exclude } from 'class-transformer';
@@ -40,6 +40,9 @@ export class User extends BaseEntity {
   @Column({nullable: true})
   photoURL: string;
 
-  @Column({nullable: true})
+  @OneToOne(() => UserSettings, settings => settings.user, {
+    cascade: true,
+    eager: true  // This automatically loads settings with users
+  })
   settings: UserSettings;
 }

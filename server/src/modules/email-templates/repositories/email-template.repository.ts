@@ -5,7 +5,7 @@ import { EmailTemplate, EmailTemplateType } from '../entities/email-template.ent
 
 @Injectable()
 export class EmailTemplateRepository extends Repository<EmailTemplate> {
-  constructor(private dataSource: DataSource) {
+  constructor(dataSource: DataSource) {
     super(EmailTemplate, dataSource.createEntityManager());
   }
 

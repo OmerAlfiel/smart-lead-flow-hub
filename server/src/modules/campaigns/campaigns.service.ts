@@ -18,7 +18,10 @@ export class CampaignsService {
     return this.campaignsRepository.save(campaign);
   }
 
-  async findAll(): Promise<Campaign[]> {
+  async findAll(status?: string): Promise<Campaign[]> {
+    if (status) {
+      return this.campaignsRepository.find({ where: { status } });
+    }
     return this.campaignsRepository.find();
   }
 

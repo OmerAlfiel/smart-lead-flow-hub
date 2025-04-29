@@ -18,5 +18,6 @@ import { ActivitiesModule } from '../activities/activities.module';
   ],
   controllers: [AnalyticsController],
   providers: [AnalyticsService],
+  exports: [AnalyticsService]
 })
 export class AnalyticsModule {}

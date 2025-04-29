@@ -25,8 +25,8 @@ export class EmailTemplatesController {
   @ApiOperation({ summary: 'Get all email templates' })
   @ApiResponse({ status: 200, description: 'Return all email templates.' })
   @ApiQuery({ name: 'active', required: false, type: Boolean, description: 'Filter by active status' })
-  findAll(@Query('active') active?: boolean) {
-    if (active === true || active === 'true') {
+  findAll(@Query('active') active?: string) {
+    if (active === 'true' || active === '1') {
       return this.emailTemplatesService.findAllActive();
     }
     return this.emailTemplatesService.findAll();

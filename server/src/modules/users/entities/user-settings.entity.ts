@@ -5,7 +5,7 @@ import { User } from './user.entity';
 
 @Entity('user_settings')
 export class UserSettings extends BaseEntity {
-  @OneToOne(() => User)
+  @OneToOne(() => User, user => user.settings, { onDelete: 'CASCADE' })
   @JoinColumn()
   user: User;
 
