@@ -18,6 +18,7 @@ import { ActivitiesModule } from './modules/activities/activities.module';
 import { FilesModule } from './modules/files/files.module';
 import { NotesModule } from './modules/notes/notes.module';
 import { TeamsModule } from './modules/teams/teams.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { TeamsModule } from './modules/teams/teams.module';
     FilesModule,
     NotesModule,
     TeamsModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
