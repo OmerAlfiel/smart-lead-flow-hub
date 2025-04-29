@@ -19,6 +19,7 @@ import { FilesModule } from './modules/files/files.module';
 import { NotesModule } from './modules/notes/notes.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { CalendarModule } from './modules/calendar/calendar.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     NotesModule,
     TeamsModule,
     ReportsModule,
+    CalendarModule,
   ],
   controllers: [AppController],
   providers: [AppService],
