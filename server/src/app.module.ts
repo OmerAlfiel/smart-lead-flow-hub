@@ -21,6 +21,7 @@ import { TeamsModule } from './modules/teams/teams.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { EmailTemplatesModule } from './modules/email-templates/email-templates.module';
+import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { EmailTemplatesModule } from './modules/email-templates/email-templates.
     ReportsModule,
     CalendarModule,
     EmailTemplatesModule,
+    AuditLogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
