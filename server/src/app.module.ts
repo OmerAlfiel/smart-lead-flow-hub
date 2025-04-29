@@ -20,6 +20,7 @@ import { NotesModule } from './modules/notes/notes.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
+import { EmailTemplatesModule } from './modules/email-templates/email-templates.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { CalendarModule } from './modules/calendar/calendar.module';
     TeamsModule,
     ReportsModule,
     CalendarModule,
+    EmailTemplatesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
