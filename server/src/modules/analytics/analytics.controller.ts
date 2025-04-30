@@ -57,4 +57,81 @@ export class AnalyticsController {
   getDashboardStats(@Query('userId') userId?: string) {
     return this.analyticsService.getDashboardStats(userId);
   }
+  
+  @Get('conversion-rates-by-source')
+  @ApiOperation({ summary: 'Get conversion rates by lead source' })
+  @ApiResponse({ status: 200, description: 'Return conversion rates by source' })
+  getConversionRatesBySource() {
+    return this.analyticsService.getConversionRatesBySource();
+  }
+  
+  @Get('time-to-convert')
+  @ApiOperation({ summary: 'Get average time to convert leads by month' })
+  @ApiResponse({ status: 200, description: 'Return time to convert data' })
+  getTimeToConvert() {
+    return this.analyticsService.getTimeToConvert();
+  }
+  
+  @Get('team-performance')
+  @ApiOperation({ summary: 'Get performance metrics by team member' })
+  @ApiResponse({ status: 200, description: 'Return team performance data' })
+  getTeamPerformance() {
+    return this.analyticsService.getTeamPerformance();
+  }
+  
+  @Get('conversion-funnel')
+  @ApiOperation({ summary: 'Get conversion funnel data' })
+  @ApiResponse({ status: 200, description: 'Return conversion funnel data' })
+  getConversionFunnel() {
+    return this.analyticsService.getConversionFunnel();
+  }
+  
+  @Get('lead-sources-over-time')
+  @ApiOperation({ summary: 'Get lead sources distribution over time' })
+  @ApiResponse({ status: 200, description: 'Return lead sources over time' })
+  getLeadSourcesOverTime() {
+    return this.analyticsService.getLeadSourcesOverTime();
+  }
+  
+  @Get('lead-quality-by-source')
+  @ApiOperation({ summary: 'Get lead quality scores by source' })
+  @ApiResponse({ status: 200, description: 'Return lead quality by source' })
+  getLeadQualityBySource() {
+    return this.analyticsService.getLeadQualityBySource();
+  }
+  
+  @Get('source-effectiveness')
+  @ApiOperation({ summary: 'Get source effectiveness metrics' })
+  @ApiResponse({ status: 200, description: 'Return source effectiveness data' })
+  getSourceEffectiveness() {
+    return this.analyticsService.getSourceEffectiveness();
+  }
+  
+  @Get('response-time')
+  @ApiOperation({ summary: 'Get average response time by team member' })
+  @ApiResponse({ status: 200, description: 'Return response time data' })
+  getResponseTime() {
+    return this.analyticsService.getResponseTime();
+  }
+  
+  @Get('deal-size')
+  @ApiOperation({ summary: 'Get average deal size by team member' })
+  @ApiResponse({ status: 200, description: 'Return deal size data' })
+  getDealSize() {
+    return this.analyticsService.getDealSize();
+  }
+  
+  @Get('growth-metrics')
+  @ApiOperation({ summary: 'Get growth metrics for leads, conversion, pipeline, and deal size' })
+  @ApiResponse({ status: 200, description: 'Return growth metrics' })
+  getGrowthMetrics() {
+    return this.analyticsService.getGrowthMetrics();
+  }
+  
+  @Get('avg-deal-size')
+  @ApiOperation({ summary: 'Get average deal size and change percentage' })
+  @ApiResponse({ status: 200, description: 'Return average deal size data' })
+  getAvgDealSize() {
+    return this.analyticsService.getAvgDealSize();
+  }
 }

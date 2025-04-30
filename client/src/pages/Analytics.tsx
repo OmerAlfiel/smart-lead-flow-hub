@@ -1,15 +1,7 @@
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-} from '@/components/ui/chart';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   LineChart, 
@@ -26,72 +18,168 @@ import {
   Bar,
   Legend
 } from 'recharts';
-
-import { mockLeads, calculateLeadStats } from '@/data/mockLeads';
+import AnalyticsService, { 
+  LeadSourceData, 
+  ConversionRateBySource, 
+  TimeToConvertData, 
+  TeamPerformanceData, 
+  ConversionFunnelData,
+  LeadSourcesOverTimeData,
+  LeadQualityData,
+  SourceEffectivenessData,
+  ResponseTimeData,
+  DealSizeData,
+  GrowthMetrics,
+  AvgDealSizeData
+} from '@/services/analytics.service';
 
 const Analytics: React.FC = () => {
-  const leadStats = calculateLeadStats(mockLeads);
+  // State for loading and error handling
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
-  // Mock data for line charts
-  const leadProgressData = [
-    { name: 'Jan', leads: 20, converted: 5 },
-    { name: 'Feb', leads: 40, converted: 10 },
-    { name: 'Mar', leads: 30, converted: 12 },
-    { name: 'Apr', leads: 70, converted: 25 },
-    { name: 'May', leads: 50, converted: 18 },
-    { name: 'Jun', leads: 90, converted: 30 },
-    { name: 'Jul', leads: 120, converted: 45 },
-  ];
-
-  // Data for pie chart
-  const statusData = [
-    { name: 'New', value: leadStats.new, color: '#3B82F6' },
-    { name: 'Contacted', value: leadStats.contacted, color: '#8B5CF6' },
-    { name: 'Qualified', value: leadStats.qualified, color: '#F59E0B' },
-    { name: 'Proposal', value: leadStats.proposal, color: '#EC4899' },
-    { name: 'Negotiation', value: leadStats.negotiation, color: '#D97706' },
-    { name: 'Won', value: leadStats.won, color: '#10B981' },
-    { name: 'Lost', value: leadStats.lost, color: '#EF4444' },
-  ];
+  // State for analytics data
+  const [timeframe, setTimeframe] = useState<string>('30days');
+  const [leadStats, setLeadStats] = useState<{
+    total: number;
+    new: number;
+    contacted: number;
+    qualified: number;
+    proposal: number;
+    negotiation: number;
+    won: number;
+    lost: number;
+  }>({
+    total: 0,
+    new: 0,
+    contacted: 0,
+    qualified: 0,
+    proposal: 0,
+    negotiation: 0,
+    won: 0,
+    lost: 0
+  });
   
-  // Source data for bar chart
-  const sourceData = [
-    { name: 'Website', value: 45 },
-    { name: 'Referral', value: 28 },
-    { name: 'Social', value: 18 },
-    { name: 'Email', value: 15 },
-    { name: 'Events', value: 12 },
-    { name: 'Other', value: 8 },
-  ];
+  const [leadGrowthData, setLeadGrowthData] = useState<{name: string; leads: number; converted: number}[]>([]);
+  const [statusDistribution, setStatusDistribution] = useState<{name: string; value: number; color: string}[]>([]);
+  const [sourceData, setSourceData] = useState<LeadSourceData[]>([]);
+  const [conversionFunnelData, setConversionFunnelData] = useState<ConversionFunnelData[]>([]);
+  const [conversionRatesBySource, setConversionRatesBySource] = useState<ConversionRateBySource[]>([]);
+  const [timeToConvertData, setTimeToConvertData] = useState<TimeToConvertData[]>([]);
+  const [teamPerformanceData, setTeamPerformanceData] = useState<TeamPerformanceData[]>([]);
+  const [leadSourcesOverTime, setLeadSourcesOverTime] = useState<LeadSourcesOverTimeData[]>([]);
+  const [leadQualityBySource, setLeadQualityBySource] = useState<LeadQualityData[]>([]);
+  const [sourceEffectiveness, setSourceEffectiveness] = useState<SourceEffectivenessData[]>([]);
+  const [responseTimeData, setResponseTimeData] = useState<ResponseTimeData[]>([]);
+  const [dealSizeData, setDealSizeData] = useState<DealSizeData[]>([]);
+  const [growthMetrics, setGrowthMetrics] = useState<GrowthMetrics>({
+    leadGrowthRate: 0,
+    conversionGrowthRate: 0,
+    pipelineGrowthRate: 0,
+    dealSizeGrowthRate: 0
+  });
+  const [avgDealSize, setAvgDealSize] = useState<AvgDealSizeData>({
+    value: 0,
+    change: 0
+  });
   
-  // Conversion data for funnel chart
-  const conversionFunnelData = [
-    { name: 'New Leads', value: leadStats.new + leadStats.contacted + leadStats.qualified + leadStats.proposal + leadStats.negotiation + leadStats.won + leadStats.lost },
-    { name: 'Contacted', value: leadStats.contacted + leadStats.qualified + leadStats.proposal + leadStats.negotiation + leadStats.won + leadStats.lost },
-    { name: 'Qualified', value: leadStats.qualified + leadStats.proposal + leadStats.negotiation + leadStats.won + leadStats.lost },
-    { name: 'Proposal', value: leadStats.proposal + leadStats.negotiation + leadStats.won + leadStats.lost },
-    { name: 'Negotiation', value: leadStats.negotiation + leadStats.won + leadStats.lost },
-    { name: 'Won', value: leadStats.won },
-  ];
-  
-  // Activity heatmap data (mock data)
-  const activityData = [
-    { date: '2023-04-01', value: 5 },
-    { date: '2023-04-02', value: 3 },
-    { date: '2023-04-03', value: 7 },
-    { date: '2023-04-04', value: 2 },
-    { date: '2023-04-05', value: 8 },
-    { date: '2023-04-06', value: 4 },
-    { date: '2023-04-07', value: 1 },
-  ];
-  
-  // Performance by team member
-  const teamPerformanceData = [
-    { name: 'Alice', leads: 45, won: 15 },
-    { name: 'Bob', leads: 30, won: 8 },
-    { name: 'Charlie', leads: 25, won: 10 },
-    { name: 'Diana', leads: 20, won: 12 },
-  ];
+  // Fetch all analytics data
+  useEffect(() => {
+    const fetchAnalyticsData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch dashboard stats which includes lead stats and status distribution
+        const dashboardStats = await AnalyticsService.getDashboardStats();
+        
+        // Extract lead stats from dashboard data
+        const totalLeads = dashboardStats.totalLeads || 0;
+        const statusCounts = dashboardStats.statusDistribution.reduce((acc, item) => {
+          acc[item.name.toLowerCase()] = item.value;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        setLeadStats({
+          total: totalLeads,
+          new: statusCounts.new || 0,
+          contacted: statusCounts.contacted || 0,
+          qualified: statusCounts.qualified || 0,
+          proposal: statusCounts.proposal || 0,
+          negotiation: statusCounts.negotiation || 0,
+          won: statusCounts.won || 0,
+          lost: statusCounts.lost || 0
+        });
+        
+        // Set status distribution
+        setStatusDistribution(dashboardStats.statusDistribution);
+        
+        // Set lead growth data
+        const growthData = dashboardStats.leadGrowth.map(item => ({
+          name: item.name,
+          leads: item.leads,
+          converted: Math.round(item.leads * (dashboardStats.conversionRate / 100))
+        }));
+        setLeadGrowthData(growthData);
+        
+        // Fetch lead sources
+        const sources = await AnalyticsService.getLeadSources();
+        setSourceData(sources);
+        
+        // Fetch conversion funnel data
+        const funnelData = await AnalyticsService.getConversionFunnel();
+        setConversionFunnelData(funnelData);
+        
+        // Fetch conversion rates by source
+        const conversionRates = await AnalyticsService.getConversionRatesBySource();
+        setConversionRatesBySource(conversionRates);
+        
+        // Fetch time to convert data
+        const timeToConvert = await AnalyticsService.getTimeToConvert();
+        setTimeToConvertData(timeToConvert);
+        
+        // Fetch team performance data
+        const teamPerformance = await AnalyticsService.getTeamPerformance();
+        setTeamPerformanceData(teamPerformance);
+        
+        // Fetch lead sources over time data
+        const sourcesOverTime = await AnalyticsService.getLeadSourcesOverTime();
+        setLeadSourcesOverTime(sourcesOverTime);
+        
+        // Fetch lead quality by source data
+        const qualityBySource = await AnalyticsService.getLeadQualityBySource();
+        setLeadQualityBySource(qualityBySource);
+        
+        // Fetch source effectiveness data
+        const effectiveness = await AnalyticsService.getSourceEffectiveness();
+        setSourceEffectiveness(effectiveness);
+        
+        // Fetch response time data
+        const responseTime = await AnalyticsService.getResponseTime();
+        setResponseTimeData(responseTime);
+        
+        // Fetch deal size data
+        const dealSize = await AnalyticsService.getDealSize();
+        setDealSizeData(dealSize);
+        
+        // Fetch growth metrics
+        const metrics = await AnalyticsService.getGrowthMetrics();
+        setGrowthMetrics(metrics);
+        
+        // Fetch average deal size
+        const avgDeal = await AnalyticsService.getAvgDealSize();
+        setAvgDealSize(avgDeal);
+        
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching analytics data:', err);
+        setError('Failed to load analytics data. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchAnalyticsData();
+  }, [timeframe]);
   
   // Color palette for charts
   const COLORS = ['#3B82F6', '#8B5CF6', '#F59E0B', '#EC4899', '#D97706', '#10B981', '#EF4444'];
@@ -114,7 +202,7 @@ const Analytics: React.FC = () => {
             <CardContent>
               <div className="text-2xl font-bold">{leadStats.total}</div>
               <p className="text-xs text-muted-foreground">
-                +12% from previous month
+                {growthMetrics.leadGrowthRate > 0 ? '+' : ''}{growthMetrics.leadGrowthRate}% from previous month
               </p>
             </CardContent>
           </Card>
@@ -126,7 +214,7 @@ const Analytics: React.FC = () => {
             <CardContent>
               <div className="text-2xl font-bold">{Math.round((leadStats.won / leadStats.total) * 100)}%</div>
               <p className="text-xs text-muted-foreground">
-                +2.5% from last quarter
+                {growthMetrics.conversionGrowthRate > 0 ? '+' : ''}{growthMetrics.conversionGrowthRate}% from last quarter
               </p>
             </CardContent>
           </Card>
@@ -138,7 +226,7 @@ const Analytics: React.FC = () => {
             <CardContent>
               <div className="text-2xl font-bold">{leadStats.contacted + leadStats.qualified + leadStats.proposal + leadStats.negotiation}</div>
               <p className="text-xs text-muted-foreground">
-                8 new leads this week
+                {growthMetrics.pipelineGrowthRate > 0 ? '+' : ''}{growthMetrics.pipelineGrowthRate}% from previous month
               </p>
             </CardContent>
           </Card>
@@ -148,9 +236,9 @@ const Analytics: React.FC = () => {
               <CardTitle className="text-sm font-medium">Avg. Deal Size</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">$8,492</div>
+              <div className="text-2xl font-bold">${avgDealSize.value.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">
-                -5% from previous month
+                {avgDealSize.change > 0 ? '+' : ''}{avgDealSize.change}% from previous month
               </p>
             </CardContent>
           </Card>
@@ -190,7 +278,7 @@ const Analytics: React.FC = () => {
                 <CardContent className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart
-                      data={leadProgressData}
+                      data={leadGrowthData}
                       margin={{
                         top: 10,
                         right: 10,
@@ -241,7 +329,7 @@ const Analytics: React.FC = () => {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={statusData}
+                        data={statusDistribution}
                         cx="50%"
                         cy="50%"
                         innerRadius={60}
@@ -252,7 +340,7 @@ const Analytics: React.FC = () => {
                         label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         labelLine={false}
                       >
-                        {statusData.map((entry, index) => (
+                        {statusDistribution.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
@@ -342,13 +430,7 @@ const Analytics: React.FC = () => {
                 <CardContent className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={[
-                        { name: 'Website', rate: 18 },
-                        { name: 'Referral', rate: 32 },
-                        { name: 'Social', rate: 15 },
-                        { name: 'Email', rate: 22 },
-                        { name: 'Events', rate: 28 }
-                      ]}
+                      data={conversionRatesBySource}
                       margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
@@ -376,15 +458,7 @@ const Analytics: React.FC = () => {
                 <CardContent className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart
-                      data={[
-                        { month: 'Jan', days: 45 },
-                        { month: 'Feb', days: 42 },
-                        { month: 'Mar', days: 38 },
-                        { month: 'Apr', days: 35 },
-                        { month: 'May', days: 30 },
-                        { month: 'Jun', days: 28 },
-                        { month: 'Jul', days: 25 }
-                      ]}
+                      data={timeToConvertData.map((item) => ({ month: item.month, days: item.days }))}
                       margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -401,10 +475,10 @@ const Analytics: React.FC = () => {
                       <Line 
                         type="monotone" 
                         dataKey="days" 
-                        name="Days to Convert" 
                         stroke="#EC4899" 
                         strokeWidth={2}
                         dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -422,14 +496,7 @@ const Analytics: React.FC = () => {
                 <CardContent className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={[
-                        { name: 'Jan', website: 20, referral: 15, social: 8, email: 12, events: 5 },
-                        { name: 'Feb', website: 25, referral: 18, social: 12, email: 15, events: 8 },
-                        { name: 'Mar', website: 18, referral: 20, social: 15, email: 10, events: 7 },
-                        { name: 'Apr', website: 22, referral: 25, social: 18, email: 14, events: 12 },
-                        { name: 'May', website: 30, referral: 22, social: 20, email: 16, events: 10 },
-                        { name: 'Jun', website: 35, referral: 28, social: 22, email: 18, events: 15 },
-                      ]}
+                      data={leadSourcesOverTime}
                       margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -443,11 +510,18 @@ const Analytics: React.FC = () => {
                         }}
                       />
                       <Legend />
-                      <Bar dataKey="website" name="Website" stackId="a" fill="#3B82F6" />
-                      <Bar dataKey="referral" name="Referral" stackId="a" fill="#8B5CF6" />
-                      <Bar dataKey="social" name="Social" stackId="a" fill="#F59E0B" />
-                      <Bar dataKey="email" name="Email" stackId="a" fill="#10B981" />
-                      <Bar dataKey="events" name="Events" stackId="a" fill="#EC4899" />
+                      {sourceData.map((source, index) => {
+                        const sourceKey = source.name.toLowerCase().replace(/\s+/g, '_');
+                        return (
+                          <Bar 
+                            key={sourceKey}
+                            dataKey={sourceKey} 
+                            name={source.name} 
+                            stackId="a" 
+                            fill={COLORS[index % COLORS.length]} 
+                          />
+                        );
+                      })}
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -461,13 +535,7 @@ const Analytics: React.FC = () => {
                 <CardContent className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={[
-                        { name: 'Website', score: 65 },
-                        { name: 'Referral', score: 85 },
-                        { name: 'Social', score: 55 },
-                        { name: 'Email', score: 70 },
-                        { name: 'Events', score: 78 }
-                      ]}
+                      data={leadQualityBySource}
                       margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -494,27 +562,23 @@ const Analytics: React.FC = () => {
                 <CardContent className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={[
-                        { name: 'Website', cost: 45 },
-                        { name: 'Referral', cost: 15 },
-                        { name: 'Social', cost: 65 },
-                        { name: 'Email', cost: 30 },
-                        { name: 'Events', cost: 85 }
-                      ]}
+                      data={sourceEffectiveness}
                       margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                       <XAxis dataKey="name" />
-                      <YAxis tickFormatter={(value) => `$${value}`} />
+                      <YAxis yAxisId="left" orientation="left" stroke="#3B82F6" />
+                      <YAxis yAxisId="right" orientation="right" stroke="#F59E0B" />
                       <Tooltip
-                        formatter={(value) => [`$${value}`, 'Cost per Lead']}
                         contentStyle={{
                           backgroundColor: "white",
                           borderRadius: "0.5rem",
                           border: "1px solid #e2e8f0"
                         }}
                       />
-                      <Bar dataKey="cost" name="Cost per Lead" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                      <Legend />
+                      <Bar yAxisId="left" dataKey="costPerLead" name="Cost per Lead ($)" fill="#3B82F6" />
+                      <Bar yAxisId="right" dataKey="roi" name="ROI" fill="#F59E0B" />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -561,12 +625,7 @@ const Analytics: React.FC = () => {
                 <CardContent className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={[
-                        { name: 'Alice', hours: 1.5 },
-                        { name: 'Bob', hours: 3.2 },
-                        { name: 'Charlie', hours: 2.1 },
-                        { name: 'Diana', hours: 1.8 }
-                      ]}
+                      data={responseTimeData}
                       margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -594,12 +653,7 @@ const Analytics: React.FC = () => {
                 <CardContent className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={[
-                        { name: 'Alice', value: 12500 },
-                        { name: 'Bob', value: 9800 },
-                        { name: 'Charlie', value: 15200 },
-                        { name: 'Diana', value: 11000 }
-                      ]}
+                      data={dealSizeData}
                       margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
