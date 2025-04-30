@@ -12,10 +12,10 @@ export class AppSettings {
   @Column({ nullable: true })
   companyLogo: string;
 
-  @Column({ nullable: true })
+  @Column({ default: '#4f46e5' })
   primaryColor: string;
 
-  @Column({ nullable: true })
+  @Column({ default: '#f97316' })
   secondaryColor: string;
 
   @Column({ default: true })
@@ -24,7 +24,7 @@ export class AppSettings {
   @Column({ default: 7 })
   invitationExpiryDays: number;
 
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: 'json', nullable: true })
   customFields: Record<string, any>;
 
   @CreateDateColumn()

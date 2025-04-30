@@ -10,44 +10,44 @@ export class IntegrationSettings {
   @Column({ default: false })
   google: boolean;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   googleConfig: Record<string, any>;
 
   @Column({ default: false })
   office365: boolean;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   office365Config: Record<string, any>;
 
   @Column({ default: false })
   slack: boolean;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   slackConfig: Record<string, any>;
 
   @Column({ default: false })
   zoom: boolean;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   zoomConfig: Record<string, any>;
 
   @Column({ default: false })
   hubspot: boolean;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   hubspotConfig: Record<string, any>;
 
   @Column({ default: false })
   salesforce: boolean;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   salesforceConfig: Record<string, any>;
 
-  @OneToOne(() => User)
-  @JoinColumn({ name: 'user_id' })
+  @OneToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn()
   user: User;
 
-  @Column({ name: 'user_id' })
+  @Column()
   userId: string;
 
   @CreateDateColumn()

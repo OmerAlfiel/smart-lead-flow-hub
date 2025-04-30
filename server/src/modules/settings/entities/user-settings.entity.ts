@@ -19,20 +19,20 @@ export class UserSettings {
   @Column({ type: 'text', nullable: true })
   bio: string;
 
-  @Column({ nullable: true })
+  @Column({ default: 'UTC' })
   timezone: string;
 
-  @Column({ nullable: true })
+  @Column({ default: 'en' })
   language: string;
 
   @Column({ default: 'light' })
   theme: string;
 
-  @OneToOne(() => User)
-  @JoinColumn({ name: 'user_id' })
+  @OneToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn()
   user: User;
 
-  @Column({ name: 'user_id' })
+  @Column()
   userId: string;
 
   @CreateDateColumn()

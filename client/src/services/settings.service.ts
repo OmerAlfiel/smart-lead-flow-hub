@@ -50,52 +50,205 @@ export interface AppSettingsData {
   secondaryColor?: string;
   enableRegistration: boolean;
   invitationExpiryDays: number;
+  maxUsersPerTeam: number;
+  defaultUserRole: string;
+  retentionPeriod: number;
   customFields?: Record<string, any>;
 }
 
 const SettingsService = {
   // User Settings
-  getUserSettings: async (): Promise<UserSettingsData> => {
-    const response = await api.get('/settings/user');
-    return response.data;
+  getUserSettings: async (): Promise<UserSettingsData & { name: string, email: string }> => {
+    try {
+      // Fetch user settings from the server
+      const response = await api.get('/settings/user');
+      const userSettingsData = response.data;
+      
+      // Fetch basic user info from the auth profile endpoint
+      const userResponse = await api.get('/auth/profile');
+      const userData = userResponse.data;
+      
+      // Combine the data to match what the client expects
+      return {
+        ...userSettingsData,
+        name: `${userData.firstName} ${userData.lastName}`,
+        email: userData.email,
+        // Map any other fields as needed
+        phone: userData.phone || '',
+        title: userData.title || userSettingsData.title || '',
+        company: userData.company || userSettingsData.company || '',
+        bio: userData.bio || userSettingsData.bio || ''
+      };
+    } catch (error) {
+      console.error('Error getting user settings:', error);
+      throw error;
+    }
   },
   
-  updateUserSettings: async (data: UserSettingsData): Promise<UserSettingsData> => {
-    const response = await api.patch('/settings/user', data);
-    return response.data;
+  updateUserSettings: async (data: UserSettingsData & { name?: string, email?: string }): Promise<UserSettingsData & { name: string, email: string }> => {
+    try {
+      // Get the current user ID from the auth context
+      const currentUser = await api.get('/users/profile');
+      const userId = currentUser.data.id;
+      
+      // Extract fields that should be updated in the user profile
+      // Only include fields that are in the UpdateUserDto
+      const userProfileData: any = {};
+      if (data.name) {
+        // Split the name into firstName and lastName
+        const nameParts = data.name.split(' ');
+        if (nameParts.length > 1) {
+          userProfileData.firstName = nameParts[0];
+          userProfileData.lastName = nameParts.slice(1).join(' ');
+        } else {
+          userProfileData.firstName = data.name;
+          userProfileData.lastName = '';
+        }
+      }
+      
+      if (data.email) {
+        userProfileData.email = data.email;
+      }
+      
+      // Update user profile if needed
+      if (Object.keys(userProfileData).length > 0) {
+        await api.patch(`/users/${userId}`, userProfileData);
+      }
+      
+      // Extract fields for user settings
+      // Only include fields that are in the UpdateUserSettingsDto
+      const userSettingsData: any = {};
+      
+      if (data.phone !== undefined) userSettingsData.phone = data.phone;
+      if (data.title !== undefined) userSettingsData.title = data.title;
+      if (data.company !== undefined) userSettingsData.company = data.company;
+      if (data.bio !== undefined) userSettingsData.bio = data.bio;
+      if (data.timezone !== undefined) userSettingsData.timezone = data.timezone;
+      if (data.language !== undefined) userSettingsData.language = data.language;
+      if (data.theme !== undefined) userSettingsData.theme = data.theme;
+      
+      // Update user settings only if there are fields to update
+      if (Object.keys(userSettingsData).length > 0) {
+        await api.patch('/settings/user', userSettingsData);
+      }
+      
+      // Return the combined updated data
+      return await SettingsService.getUserSettings();
+    } catch (error) {
+      console.error('Error updating user settings:', error);
+      throw error;
+    }
   },
   
   // Notification Settings
   getNotificationSettings: async (): Promise<NotificationSettingsData> => {
-    const response = await api.get('/settings/notifications');
-    return response.data;
+    try {
+      const response = await api.get('/settings/notifications');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting notification settings:', error);
+      throw error;
+    }
   },
   
   updateNotificationSettings: async (data: NotificationSettingsData): Promise<NotificationSettingsData> => {
-    const response = await api.patch('/settings/notifications', data);
-    return response.data;
+    try {
+      const response = await api.patch('/settings/notifications', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating notification settings:', error);
+      throw error;
+    }
   },
   
   // Integration Settings
   getIntegrationSettings: async (): Promise<IntegrationSettingsData> => {
-    const response = await api.get('/settings/integrations');
-    return response.data;
+    try {
+      const response = await api.get('/settings/integrations');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting integration settings:', error);
+      throw error;
+    }
   },
   
   updateIntegrationSettings: async (data: IntegrationSettingsData): Promise<IntegrationSettingsData> => {
-    const response = await api.patch('/settings/integrations', data);
-    return response.data;
+    try {
+      const response = await api.patch('/settings/integrations', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating integration settings:', error);
+      throw error;
+    }
   },
   
   // App Settings
   getAppSettings: async (): Promise<AppSettingsData> => {
-    const response = await api.get('/settings/app');
-    return response.data;
+    try {
+      const response = await api.get('/settings/app');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting app settings:', error);
+      throw error;
+    }
   },
   
   updateAppSettings: async (data: AppSettingsData): Promise<AppSettingsData> => {
-    const response = await api.patch('/settings/app', data);
-    return response.data;
+    try {
+      const response = await api.patch('/settings/app', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating app settings:', error);
+      throw error;
+    }
+  },
+
+  // Team Members
+  getTeamMembers: async (): Promise<Array<{id: string, name: string, email: string, role: string}>> => {
+    try {
+      // Get the current team ID - for now we'll assume there's only one team
+      // In a real app, you might need to fetch the current team ID from somewhere
+      const teamsResponse = await api.get('/teams');
+      const teams = teamsResponse.data;
+      
+      if (teams.length === 0) {
+        return [];
+      }
+      
+      // Use the first team's ID to fetch its members
+      const teamId = teams[0].id;
+      const response = await api.get(`/teams/${teamId}/members`);
+      
+      // Transform the data to match what the Settings component expects
+      return response.data.map(member => ({
+        id: member.id,
+        name: `${member.user.firstName} ${member.user.lastName}`,
+        email: member.user.email,
+        role: member.role
+      }));
+    } catch (error) {
+      console.error('Error getting team members:', error);
+      throw error;
+    }
+  },
+
+  updateTeamMember: async (id: string, data: {role: string}): Promise<any> => {
+    try {
+      const response = await api.patch(`/teams/members/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating team member:', error);
+      throw error;
+    }
+  },
+
+  removeTeamMember: async (id: string): Promise<void> => {
+    try {
+      await api.delete(`/teams/members/${id}`);
+    } catch (error) {
+      console.error('Error removing team member:', error);
+      throw error;
+    }
   }
 };
 

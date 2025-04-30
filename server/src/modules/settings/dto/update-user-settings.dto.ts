@@ -1,39 +1,35 @@
 // server/src/modules/settings/dto/update-user-settings.dto.ts
-import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateUserSettingsDto {
-  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(20)
   phone?: string;
 
-  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   title?: string;
 
-  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   company?: string;
 
-  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   bio?: string;
 
-  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
   timezone?: string;
 
-  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
   language?: string;
 
-  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
   theme?: string;

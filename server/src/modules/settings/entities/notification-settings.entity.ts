@@ -31,11 +31,11 @@ export class NotificationSettings {
   @Column({ default: false })
   pushReports: boolean;
 
-  @OneToOne(() => User)
-  @JoinColumn({ name: 'user_id' })
+  @OneToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn()
   user: User;
 
-  @Column({ name: 'user_id' })
+  @Column()
   userId: string;
 
   @CreateDateColumn()

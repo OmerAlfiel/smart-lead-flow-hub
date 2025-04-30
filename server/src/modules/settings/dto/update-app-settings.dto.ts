@@ -1,39 +1,33 @@
 // server/src/modules/settings/dto/update-app-settings.dto.ts
-import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsBoolean, IsNumber, IsObject } from 'class-validator';
+import { IsBoolean, IsNumber, IsObject, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 export class UpdateAppSettingsDto {
-  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   companyName?: string;
 
-  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
   companyLogo?: string;
 
-  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
   primaryColor?: string;
 
-  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
   secondaryColor?: string;
 
-  @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
   enableRegistration?: boolean;
 
-  @ApiProperty({ required: false })
   @IsOptional()
   @IsNumber()
+  @Min(1)
   invitationExpiryDays?: number;
 
-  @ApiProperty({ required: false })
   @IsOptional()
   @IsObject()
   customFields?: Record<string, any>;

@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import InvitationService, { Invitation } from '@/services/invitation.service';
+import SettingsService, { 
+  UserSettingsData, 
+  NotificationSettingsData, 
+  IntegrationSettingsData,
+  AppSettingsData
+} from '@/services/settings.service';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -19,42 +25,38 @@ const Settings: React.FC = () => {
   
   // Profile settings
   const [profile, setProfile] = useState({
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    phone: '+1 (555) 123-4567',
-    title: 'Sales Director',
-    company: 'Acme Inc.',
-    bio: 'Sales professional with 10+ years of experience in B2B software sales.'
+    name: '',
+    email: '',
+    phone: '',
+    title: '',
+    company: '',
+    bio: ''
   });
   
   // Notification settings
-  const [notifications, setNotifications] = useState({
-    emailNewLead: true,
-    emailLeadUpdate: true,
-    emailTaskReminders: true,
-    emailReports: true,
-    pushNewLead: true,
+  const [notifications, setNotifications] = useState<NotificationSettingsData>({
+    emailNewLead: false,
+    emailLeadUpdate: false,
+    emailTaskReminders: false,
+    emailReports: false,
+    pushNewLead: false,
     pushLeadUpdate: false,
-    pushTaskReminders: true,
+    pushTaskReminders: false,
     pushReports: false
   });
   
   // Integration settings
-  const [integrations, setIntegrations] = useState({
-    google: true,
+  const [integrations, setIntegrations] = useState<IntegrationSettingsData>({
+    google: false,
     office365: false,
-    slack: true,
+    slack: false,
     zoom: false,
     hubspot: false,
     salesforce: false
   });
   
   // Team settings
-  const [teamMembers, setTeamMembers] = useState([
-    { id: '1', name: 'Alice Smith', email: 'alice@example.com', role: 'admin' },
-    { id: '2', name: 'Bob Johnson', email: 'bob@example.com', role: 'member' },
-    { id: '3', name: 'Charlie Brown', email: 'charlie@example.com', role: 'member' }
-  ]);
+  const [teamMembers, setTeamMembers] = useState<Array<{id: string, name: string, email: string, role: string}>>([]);
   
   // New team member form
   const [newMember, setNewMember] = useState({
@@ -71,175 +73,402 @@ const Settings: React.FC = () => {
   });
   const [isInviting, setIsInviting] = useState(false);
   
-  useEffect(() => {
-    if (isAdmin()) {
-      fetchInvitations();
-    }
-  }, []);
+  // App settings (for admin)
+  const [appSettings, setAppSettings] = useState<AppSettingsData>({
+    companyName: '',
+    enableRegistration: false,
+    invitationExpiryDays: 7,
+    maxUsersPerTeam: 5,
+    defaultUserRole: 'agent',
+    retentionPeriod: 30
+  });
   
-  const fetchInvitations = async () => {
+  // Loading state
+  const [isLoading, setIsLoading] = useState({
+    profile: false,
+    notifications: false,
+    integrations: false,
+    appSettings: false
+  });
+  
+  // Error state
+  const [hasError, setHasError] = useState({
+    profile: false,
+    notifications: false,
+    integrations: false,
+    appSettings: false
+  });
+  
+  // Fetch settings data
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        // Fetch user settings
+        setIsLoading(prev => ({ ...prev, profile: true }));
+        const userSettingsData = await SettingsService.getUserSettings();
+        setProfile(prev => ({
+          ...prev,
+          ...userSettingsData
+        }));
+        setIsLoading(prev => ({ ...prev, profile: false }));
+        
+        // Fetch notification settings
+        setIsLoading(prev => ({ ...prev, notifications: true }));
+        const notificationSettingsData = await SettingsService.getNotificationSettings();
+        setNotifications(notificationSettingsData);
+        setIsLoading(prev => ({ ...prev, notifications: false }));
+        
+        // Fetch integration settings
+        setIsLoading(prev => ({ ...prev, integrations: true }));
+        const integrationSettingsData = await SettingsService.getIntegrationSettings();
+        setIntegrations(integrationSettingsData);
+        setIsLoading(prev => ({ ...prev, integrations: false }));
+        
+        // Fetch team members (admin only)
+        if (isAdmin()) {
+          try {
+            // Fetch team members
+            const teamMembersData = await SettingsService.getTeamMembers();
+            setTeamMembers(teamMembersData);
+            
+            // Fetch pending invitations
+            const invitations = await InvitationService.getInvitations();
+            setPendingInvitations(invitations);
+          } catch (error) {
+            console.error('Error fetching team data:', error);
+            toast({
+              title: "Error",
+              description: "Failed to load team data. Please try again later.",
+              variant: "destructive"
+            });
+          }
+        }
+        
+        // Fetch app settings (admin only)
+        if (isAdmin()) {
+          setIsLoading(prev => ({ ...prev, appSettings: true }));
+          const appSettingsData = await SettingsService.getAppSettings();
+          setAppSettings(appSettingsData);
+          setIsLoading(prev => ({ ...prev, appSettings: false }));
+        }
+      } catch (error) {
+        console.error('Error fetching settings:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load settings. Please try again later.",
+          variant: "destructive"
+        });
+        
+        // Set error states
+        setHasError({
+          profile: true,
+          notifications: true,
+          integrations: true,
+          appSettings: true
+        });
+        
+        // Set loading to false
+        setIsLoading({
+          profile: false,
+          notifications: false,
+          integrations: false,
+          appSettings: false
+        });
+      }
+    };
+    
+    fetchSettings();
+  }, [isAdmin, toast]);
+  
+  // Handle profile update
+  const updateProfile = async () => {
     try {
-      const invitations = await InvitationService.getInvitations();
-      setPendingInvitations(invitations);
-    } catch (error) {
-      console.error('Failed to fetch invitations:', error);
+      setIsLoading(prev => ({ ...prev, profile: true }));
+      
+      // Extract only the fields that should be sent to the settings API
+      const settingsData: UserSettingsData = {
+        phone: profile.phone,
+        title: profile.title,
+        company: profile.company,
+        bio: profile.bio
+      };
+      
+      const updatedSettings = await SettingsService.updateUserSettings(settingsData);
+      
+      // Merge the updated settings with the existing profile data
+      setProfile(prev => ({
+        ...prev,
+        ...updatedSettings
+      }));
+      
       toast({
-        title: "Failed to load invitations",
-        description: "There was an error loading the invitations.",
-        variant: "destructive",
+        title: "Profile updated",
+        description: "Your profile settings have been saved successfully."
       });
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update profile settings.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(prev => ({ ...prev, profile: false }));
     }
   };
   
-  const sendInvitation = async () => {
-    if (!newInvitation.email || !newInvitation.role) {
+  // Handle notification settings update
+  const updateNotificationSettings = async () => {
+    try {
+      setIsLoading(prev => ({ ...prev, notifications: true }));
+      const updatedSettings = await SettingsService.updateNotificationSettings(notifications);
+      setNotifications(updatedSettings);
       toast({
-        title: "Missing information",
-        description: "Please enter an email and select a role.",
+        title: "Notifications updated",
+        description: "Your notification preferences have been saved."
+      });
+    } catch (error) {
+      console.error('Error updating notification settings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update notification settings.",
         variant: "destructive"
       });
-      return;
+    } finally {
+      setIsLoading(prev => ({ ...prev, notifications: false }));
     }
+  };
+  
+  // Handle notification toggle
+  const toggleNotification = (key: keyof NotificationSettingsData) => {
+    const updatedNotifications = { ...notifications, [key]: !notifications[key] };
+    setNotifications(updatedNotifications);
+    
+    // Debounce the API call to avoid too many requests
+    const timeoutId = setTimeout(() => {
+      SettingsService.updateNotificationSettings(updatedNotifications)
+        .catch(error => {
+          console.error('Error updating notification setting:', error);
+          // Revert the change if the API call fails
+          setNotifications(notifications);
+          toast({
+            title: "Error",
+            description: "Failed to update notification setting.",
+            variant: "destructive"
+          });
+        });
+    }, 500);
+    
+    return () => clearTimeout(timeoutId);
+  };
+  
+  // Handle integration toggle with server update
+  const toggleIntegration = (key: keyof IntegrationSettingsData) => {
+    const updatedIntegrations = { ...integrations, [key]: !integrations[key] };
+    setIntegrations(updatedIntegrations);
+    
+    // Update on the server
+    setIsLoading(prev => ({ ...prev, integrations: true }));
+    SettingsService.updateIntegrationSettings(updatedIntegrations)
+      .then(() => {
+        toast({
+          title: "Integration updated",
+          description: `${key.charAt(0).toUpperCase() + key.slice(1)} integration ${updatedIntegrations[key] ? 'enabled' : 'disabled'}.`
+        });
+      })
+      .catch(error => {
+        console.error('Error updating integration:', error);
+        // Revert the change if the API call fails
+        setIntegrations(integrations);
+        toast({
+          title: "Error",
+          description: "Failed to update integration setting.",
+          variant: "destructive"
+        });
+      })
+      .finally(() => {
+        setIsLoading(prev => ({ ...prev, integrations: false }));
+      });
+  };
+  
+  // Handle integration settings update
+  const updateIntegrationSettings = async () => {
+    try {
+      setIsLoading(prev => ({ ...prev, integrations: true }));
+      const updatedSettings = await SettingsService.updateIntegrationSettings(integrations);
+      setIntegrations(updatedSettings);
+      toast({
+        title: "Integrations updated",
+        description: "Your integration settings have been saved."
+      });
+    } catch (error) {
+      console.error('Error updating integration settings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update integration settings.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(prev => ({ ...prev, integrations: false }));
+    }
+  };
+  
+  // Handle app settings update (admin only)
+  const updateAppSettings = async () => {
+    try {
+      setIsLoading(prev => ({ ...prev, appSettings: true }));
+      const updatedSettings = await SettingsService.updateAppSettings(appSettings);
+      setAppSettings(updatedSettings);
+      toast({
+        title: "App settings updated",
+        description: "Application settings have been saved successfully."
+      });
+    } catch (error) {
+      console.error('Error updating app settings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update application settings.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(prev => ({ ...prev, appSettings: false }));
+    }
+  };
+  
+  // Handle sending invitation
+  const sendInvitation = async () => {
+    if (!newInvitation.email || !newInvitation.role) return;
     
     setIsInviting(true);
-    
     try {
-      const result = await InvitationService.createInvitation(newInvitation);
-      const invitationLink = `${window.location.origin}/signup?token=${result.token}`;
-      await navigator.clipboard.writeText(invitationLink);
-      
-      toast({
-        title: "Invitation sent!",
-        description: "The invitation link has been copied to your clipboard.",
+      const result = await InvitationService.createInvitation({
+        email: newInvitation.email,
+        role: newInvitation.role
       });
       
-      setNewInvitation({ email: '', role: 'agent' });
-      fetchInvitations();
-    } catch (error) {
+      // Copy invitation link to clipboard
+      const invitationLink = `${window.location.origin}/register?token=${result.token}`;
+      navigator.clipboard.writeText(invitationLink);
+      
+      // Fetch updated invitations list
+      const invitations = await InvitationService.getInvitations();
+      setPendingInvitations(invitations);
+      
+      // Reset form
+      setNewInvitation({ email: '', role: '' });
+      
       toast({
-        title: "Failed to send invitation",
-        description: "There was an error sending the invitation.",
+        title: "Invitation sent",
+        description: "Invitation link has been copied to your clipboard."
+      });
+    } catch (error) {
+      console.error('Error sending invitation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send invitation. Please try again.",
         variant: "destructive"
       });
     } finally {
       setIsInviting(false);
     }
   };
-  
-  const copyInvitationLink = (token: string) => {
-    const invitationLink = `${window.location.origin}/signup?token=${token}`;
-    navigator.clipboard.writeText(invitationLink);
-    
-    toast({
-      title: "Link copied!",
-      description: "The invitation link has been copied to your clipboard.",
-    });
-  };
-  
+
   const resendInvitation = async (id: string) => {
     try {
-      await InvitationService.resendInvitation(id);
+      const result = await InvitationService.resendInvitation(id);
+      
+      // Copy invitation link to clipboard
+      const invitationLink = `${window.location.origin}/register?token=${result.token}`;
+      navigator.clipboard.writeText(invitationLink);
       
       toast({
         title: "Invitation resent",
-        description: "The invitation has been resent successfully.",
+        description: "New invitation link has been copied to your clipboard."
       });
-      
-      fetchInvitations();
     } catch (error) {
+      console.error('Error resending invitation:', error);
       toast({
-        title: "Failed to resend invitation",
-        description: "There was an error resending the invitation.",
-        variant: "destructive"
-      });
-    }
-  };
-  
-  const deleteInvitation = async (id: string) => {
-    try {
-      await InvitationService.deleteInvitation(id);
-      
-      toast({
-        title: "Invitation deleted",
-        description: "The invitation has been deleted successfully.",
-      });
-      
-      setPendingInvitations(pendingInvitations.filter(inv => inv.id !== id));
-    } catch (error) {
-      toast({
-        title: "Failed to delete invitation",
-        description: "There was an error deleting the invitation.",
+        title: "Error",
+        description: "Failed to resend invitation. Please try again.",
         variant: "destructive"
       });
     }
   };
 
-  // Handle profile update
-  const updateProfile = () => {
-    toast({
-      title: "Profile updated",
-      description: "Your profile information has been saved."
-    });
-  };
-  
-  // Handle notification settings update
-  const updateNotifications = () => {
-    toast({
-      title: "Notification settings updated",
-      description: "Your notification preferences have been saved."
-    });
-  };
-  
-  // Handle integration toggle
-  const toggleIntegration = (key: keyof typeof integrations) => {
-    const updatedIntegrations = {...integrations, [key]: !integrations[key]};
-    setIntegrations(updatedIntegrations);
-    
-    toast({
-      title: updatedIntegrations[key] ? "Integration enabled" : "Integration disabled",
-      description: `${key.charAt(0).toUpperCase() + key.slice(1)} integration has been ${updatedIntegrations[key] ? 'enabled' : 'disabled'}.`
-    });
-  };
-  
-  // Handle adding new team member
-  const addTeamMember = () => {
-    if (!newMember.name || !newMember.email) {
+  const deleteInvitation = async (id: string) => {
+    try {
+      await InvitationService.deleteInvitation(id);
+      
+      // Update local state
+      setPendingInvitations(pendingInvitations.filter(invitation => invitation.id !== id));
+      
       toast({
-        title: "Missing information",
-        description: "Please enter a name and email for the new team member.",
+        title: "Invitation deleted",
+        description: "The invitation has been deleted successfully."
+      });
+    } catch (error) {
+      console.error('Error deleting invitation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete invitation. Please try again.",
         variant: "destructive"
       });
-      return;
     }
-    
-    const newTeamMember = {
-      id: Date.now().toString(),
-      name: newMember.name,
-      email: newMember.email,
-      role: newMember.role
-    };
-    
-    setTeamMembers([...teamMembers, newTeamMember]);
-    setNewMember({ name: '', email: '', role: 'member' });
+  };
+
+  const copyInvitationLink = (token: string) => {
+    const invitationLink = `${window.location.origin}/register?token=${token}`;
+    navigator.clipboard.writeText(invitationLink);
     
     toast({
-      title: "Team member added",
-      description: `${newTeamMember.name} has been added to your team.`
+      title: "Link copied",
+      description: "Invitation link has been copied to your clipboard."
     });
   };
-  
-  // Handle removing team member
-  const removeTeamMember = (id: string) => {
-    const memberToRemove = teamMembers.find(member => member.id === id);
-    const updatedMembers = teamMembers.filter(member => member.id !== id);
-    setTeamMembers(updatedMembers);
-    
-    toast({
-      title: "Team member removed",
-      description: `${memberToRemove?.name} has been removed from your team.`
-    });
+
+  const removeTeamMember = async (id: string) => {
+    try {
+      await SettingsService.removeTeamMember(id);
+      
+      toast({
+        title: "Team member removed",
+        description: "The team member has been removed successfully."
+      });
+      
+      setTeamMembers(teamMembers.filter(member => member.id !== id));
+    } catch (error) {
+      console.error('Error removing team member:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove team member.",
+        variant: "destructive"
+      });
+    }
   };
-  
+
+  const updateTeamMemberRole = async (id: string, newRole: string) => {
+    try {
+      await SettingsService.updateTeamMember(id, { role: newRole });
+      
+      // Update local state with the new role
+      setTeamMembers(teamMembers.map(member => 
+        member.id === id ? { ...member, role: newRole } : member
+      ));
+      
+      toast({
+        title: "Role updated",
+        description: "Team member role has been updated successfully."
+      });
+    } catch (error) {
+      console.error('Error updating team member role:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update team member role.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="flex flex-col space-y-6">
@@ -343,7 +572,7 @@ const Settings: React.FC = () => {
                 </div>
               </CardContent>
               <CardFooter className="flex justify-end">
-                <Button onClick={updateProfile}>Save Changes</Button>
+                <Button onClick={updateProfile} disabled={isLoading.profile}>Save Changes</Button>
               </CardFooter>
             </Card>
             
@@ -403,7 +632,7 @@ const Settings: React.FC = () => {
                       </div>
                       <Switch 
                         checked={notifications.emailNewLead} 
-                        onCheckedChange={(checked) => setNotifications({...notifications, emailNewLead: checked})} 
+                        onCheckedChange={(checked) => toggleNotification('emailNewLead')} 
                       />
                     </div>
                     <div className="flex items-center justify-between">
@@ -413,7 +642,7 @@ const Settings: React.FC = () => {
                       </div>
                       <Switch 
                         checked={notifications.emailLeadUpdate} 
-                        onCheckedChange={(checked) => setNotifications({...notifications, emailLeadUpdate: checked})} 
+                        onCheckedChange={(checked) => toggleNotification('emailLeadUpdate')} 
                       />
                     </div>
                     <div className="flex items-center justify-between">
@@ -423,7 +652,7 @@ const Settings: React.FC = () => {
                       </div>
                       <Switch 
                         checked={notifications.emailTaskReminders} 
-                        onCheckedChange={(checked) => setNotifications({...notifications, emailTaskReminders: checked})} 
+                        onCheckedChange={(checked) => toggleNotification('emailTaskReminders')} 
                       />
                     </div>
                     <div className="flex items-center justify-between">
@@ -433,7 +662,7 @@ const Settings: React.FC = () => {
                       </div>
                       <Switch 
                         checked={notifications.emailReports} 
-                        onCheckedChange={(checked) => setNotifications({...notifications, emailReports: checked})} 
+                        onCheckedChange={(checked) => toggleNotification('emailReports')} 
                       />
                     </div>
                   </div>
@@ -451,7 +680,7 @@ const Settings: React.FC = () => {
                       </div>
                       <Switch 
                         checked={notifications.pushNewLead} 
-                        onCheckedChange={(checked) => setNotifications({...notifications, pushNewLead: checked})} 
+                        onCheckedChange={(checked) => toggleNotification('pushNewLead')} 
                       />
                     </div>
                     <div className="flex items-center justify-between">
@@ -461,7 +690,7 @@ const Settings: React.FC = () => {
                       </div>
                       <Switch 
                         checked={notifications.pushLeadUpdate} 
-                        onCheckedChange={(checked) => setNotifications({...notifications, pushLeadUpdate: checked})} 
+                        onCheckedChange={(checked) => toggleNotification('pushLeadUpdate')} 
                       />
                     </div>
                     <div className="flex items-center justify-between">
@@ -471,7 +700,7 @@ const Settings: React.FC = () => {
                       </div>
                       <Switch 
                         checked={notifications.pushTaskReminders} 
-                        onCheckedChange={(checked) => setNotifications({...notifications, pushTaskReminders: checked})} 
+                        onCheckedChange={(checked) => toggleNotification('pushTaskReminders')} 
                       />
                     </div>
                     <div className="flex items-center justify-between">
@@ -481,14 +710,14 @@ const Settings: React.FC = () => {
                       </div>
                       <Switch 
                         checked={notifications.pushReports} 
-                        onCheckedChange={(checked) => setNotifications({...notifications, pushReports: checked})} 
+                        onCheckedChange={(checked) => toggleNotification('pushReports')} 
                       />
                     </div>
                   </div>
                 </div>
               </CardContent>
               <CardFooter className="flex justify-end">
-                <Button onClick={updateNotifications}>Save Preferences</Button>
+                <Button onClick={updateNotificationSettings} disabled={isLoading.notifications}>Save Preferences</Button>
               </CardFooter>
             </Card>
           </TabsContent>
@@ -509,13 +738,14 @@ const Settings: React.FC = () => {
                     <div className="flex items-center gap-4">
                       <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M15.545 6.558a9.42 9.42 0 0 1 .139 1.626c0 2.434-.87 4.492-2.384 5.885h.002C11.978 15.292 10.158 16 8 16A8 8 0 1 1 8 0a7.689 7.689 0 0 1 5.352 2.082l-2.284 2.284A4.347 4.347 0 0 0 8 3.166c-2.087 0-3.86 1.408-4.492 3.304a4.792 4.792 0 0 0 0 3.063h.003c.635 1.893 2.405 3.301 4.492 3.301 1.078 0 2.004-.276 2.722-.764h-.003a3.702 3.702 0 0 0 1.599-2.431H8v-3.08h7.545z" />
+                          <path d="M15.545 6.558a9.42 9.42 0 0 1 .139 1.626c0 2.434-.87 4.492-2.384 5.885h.002C11.978 15.292 10.158 16 8 16A8 8 0 1 1 8 0a7.689 7.689 0 0 1 5.352 2.082l-2.284 2.284A4.347 4.347 0 0 0 8 3.166c-2.087 0-3.86 1.408-4.492 3.304a4.792 4.792 0 0 0 0 3.063h.003c.635 1.893 2.405 3.301 4.492 3.301 1.078 0 2.004-.276 2.722-.764h-.003a3.702 3.702 0 0 0 1.599-2.431H8v-3.08h7.545z"/>
                         </svg>
                       </div>
                       <div>
                         <h4 className="font-medium">Google</h4>
                         <p className="text-sm text-muted-foreground">Connect your Google account to sync contacts and calendar.</p>
                       </div>
+                    </div>
                     </div>
                     <Switch 
                       checked={integrations.google} 
@@ -528,7 +758,7 @@ const Settings: React.FC = () => {
                     <div className="flex items-center gap-4">
                       <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-600" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M11.5 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6.5v18zM13 3v18h6a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-6z" />
+                          <path d="M11.5 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6.5v18zM13 3v18h6a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-6z"/>
                         </svg>
                       </div>
                       <div>
@@ -547,246 +777,232 @@ const Settings: React.FC = () => {
                     <div className="flex items-center gap-4">
                       <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-600" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h4 className="font-medium">Slack</h4>
-                        <p className="text-sm text-muted-foreground">Receive notifications and updates in your Slack workspace.</p>
-                      </div>
+                          <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/>
+                      </svg>
                     </div>
-                    <Switch 
-                      checked={integrations.slack} 
-                      onCheckedChange={() => toggleIntegration('slack')} 
-                    />
-                  </div>
-                  
-                  {/* Zoom Integration */}
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M24 11.5c0 6.351-5.149 11.5-11.5 11.5S1 17.851 1 11.5 6.149 0 12.5 0 24 5.149 24 11.5zm-8.5 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h4 className="font-medium">Zoom</h4>
-                        <p className="text-sm text-muted-foreground">Schedule and join Zoom meetings directly from leads.</p>
-                      </div>
+                    <div>
+                      <h4 className="font-medium">Slack</h4>
+                      <p className="text-sm text-muted-foreground">Receive notifications and updates in your Slack workspace.</p>
                     </div>
-                    <Switch 
-                      checked={integrations.zoom} 
-                      onCheckedChange={() => toggleIntegration('zoom')} 
-                    />
                   </div>
-                  
-                  {/* HubSpot Integration */}
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-orange-600" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M18.766 0H7.323C3.849 0 1.025 2.12.179 5.414c-.105.414.21.828.631.828h7.648c.421 0 .737-.414.632-.828-.421-1.242-1.579-2.12-2.947-2.12h-.316v.414c0 1.449 1.158 2.535 2.526 2.535.842 0 1.579-.414 2-.934C10.985 6.655 12.144 7.38 13.513 7.38h4.492c1.368 0 2.525-1.14 2.525-2.534V2.535C20.53 1.14 19.814 0 18.766 0zM7.85 4.845c0 .414-.316.828-.842.828-.526 0-.842-.414-.842-.828 0-.413.316-.827.842-.827.526 0 .842.414.842.827zm10.143 0c0 .414-.316.828-.842.828-.526 0-.842-.414-.842-.828 0-.413.316-.827.842-.827.526 0 .842.414.842.827zM24 7.38c0 .414-.316.828-.737.828h-7.648c-.421 0-.736-.414-.631-.828.421-1.242 1.578-2.12 2.947-2.12h.315v.414c0 1.449-1.157 2.535-2.525 2.535-.842 0-1.579-.414-2-.934-.633 1.346-1.79 2.07-3.159 2.07H5.06c-1.368 0-2.526-1.14-2.526-2.535V4.656c0-1.449.737-2.535 1.79-2.535h11.438c3.474 0 6.298 2.12 7.144 5.414.105.414.421.828.842.828.42 0 .736-.414.631-.828C23.369 3.12 20.105 0 16.105 0h-10.2C2.632 0 0 2.656 0 5.897v1.657c0 3.242 2.632 5.897 5.895 5.897h3.79c1.474 0 2.841-.62 3.789-1.552.947.932 2.316 1.552 3.79 1.552h.736c3.263 0 5.895-2.655 5.895-5.897V5.897c.105-3.241-2.526-5.897-5.79-5.897H15.79c-1.474 0-2.842.62-3.79 1.552C11.053.62 9.685 0 8.21 0h-.736C5.527 0 3.79 1.242 2.948 3.104h-.631C1.053 3.104 0 4.242 0 5.69v.828c0 1.449 1.053 2.586 2.316 2.586h.631C3.79 11.034 5.527 12.28 7.474 12.28h.738c1.474 0 2.842-.622 3.79-1.553.947.931 2.315 1.553 3.789 1.553h.736c3.263 0 5.895-2.656 5.895-5.897V5.725c0-.413.316-.827.736-.827.421 0 .842.414.842.827v.621c0 .414-.316.828-.736.828-.421 0-.737.414-.637.828.106.414.422.828.843.828.947 0 1.684-.827 1.684-1.863V5.725c0-1.035-.737-1.863-1.684-1.863-.947 0-1.684.828-1.684 1.863v.621c0 2.414-1.894 4.38-4.21 4.38h-.737c-1.157 0-2.21-.621-2.842-1.553-.526-.621-1.052-1.035-1.789-1.035s-1.263.414-1.79 1.035c-.631.932-1.684 1.553-2.842 1.553h-.736c-2.316 0-4.21-1.966-4.21-4.38V4.346c0-2.414 1.894-4.38 4.21-4.38h.736c1.158 0 2.21.621 2.842 1.552.526.62 1.053 1.035 1.79 1.035.736 0 1.263-.414 1.79-1.035.63-.93 1.684-1.552 2.84-1.552h3.159c2.315 0 4.21 1.966 4.21 4.38v1.035zm0 15.518v-5.896c0-3.242-2.631-5.898-5.894-5.898h-3.79c-1.473 0-2.84.621-3.789 1.553-.947-.932-2.316-1.553-3.79-1.553h-.735c-3.263 0-5.895 2.656-5.895 5.898v5.897c0 .413.316.827.736.827h22.42c.422 0 .737-.414.737-.828zm-1.474-.827H1.474v-5.07c0-2.413 1.895-4.38 4.21-4.38h.737c1.158 0 2.21.622 2.842 1.553.526.621 1.052 1.035 1.79 1.035.736 0 1.263-.414 1.79-1.035.63-.931 1.684-1.553 2.84-1.553h3.16c2.314 0 4.209 1.967 4.209 4.38v5.07z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h4 className="font-medium">HubSpot</h4>
-                        <p className="text-sm text-muted-foreground">Sync contacts and deals with your HubSpot account.</p>
-                      </div>
+                  <Switch 
+                    checked={integrations.slack} 
+                    onCheckedChange={() => toggleIntegration('slack')} 
+                  />
+                </div>
+                
+                {/* Zoom Integration */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M24 11.5c0 6.351-5.149 11.5-11.5 11.5S1 17.851 1 11.5 6.149 0 12.5 0 24 5.149 24 11.5zm-8.5 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+                      </svg>
                     </div>
-                    <Switch 
-                      checked={integrations.hubspot} 
-                      onCheckedChange={() => toggleIntegration('hubspot')} 
-                    />
-                  </div>
-                  
-                  {/* Salesforce Integration */}
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-700" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M15.324 16.412c.106-.268.106-.696-.106-.983-.106-.286-.425-.502-.743-.558 1.496-.177 2.982-1.01 2.982-2.772 0-1.01-.53-1.77-1.39-2.219.53-1.01-.089-1.99-.089-1.99s-.925-.179-1.938.724c-.671-.179-1.39-.268-2.13-.268-.636 0-1.273.09-1.885.268-.989-.902-1.938-.724-1.938-.724s-.618.98-.088 1.99c-.854.45-1.391 1.209-1.391 2.219 0 1.77 1.497 2.595 2.982 2.772-.318.09-.636.268-.742.558-.212.287-.212.715-.106.983-1.03.09-.742-.724-.742-.724-.265-.451-.636-.63-.954-.63 0 0-.318.268 0 .45.318.178.318.45.53.714 0 0 .318.63 1.273.63.954 0 1.484-.09 1.802-.178.282 1.034 1.201 1.77 2.095 1.77.9 0 1.696-.736 1.979-1.77.318.09.83.178 1.803.178.954 0 1.272-.63 1.272-.63.212-.264.212-.536.53-.714.317-.182 0-.45 0-.45-.318 0-.69.179-.954.63 0-.002-.318.813-.742.724h-.002zm-3.512.787c-.53 0-.954-.724-1.06-.983-.107-.268-.107-.536-.107-.815h2.343c0 .279 0 .547-.106.815-.107.259-.53.983-1.07.983zm.636-4.743c-.43 0-.954-.268-.954-.696 0-.45.424-.697.954-.697.53 0 .954.268.954.697 0 .428-.425.696-.954.696zm5.115-1.168c0 .696-.107 1.278-.425 1.78-1.06 1.687-4.043 1.48-6.505 1.48-2.46 0-5.444.207-6.505-1.48-.318-.502-.425-1.084-.425-1.78 0-1.126.425-2.236 1.39-3.13-.177-.63-.177-1.48-.177-2.235.106-.268.106-.536.213-.815-1.273.09-2.39-.45-2.39-.45v-.814s1.732-.268 2.672.268c-.106-.09-.106-.179-.212-.268-.071-.27-.177-.54-.177-.815 0-.277 0-.8.106-1.09.106-.177.213-.268.319-.268h.53s.212.902.53 1.347c.318-.724.954-1.48.954-1.48s.636.756.954 1.48c.318-.445.53-1.347.53-1.347h.53c.106 0 .213.09.319.268.106.29.106.813.106 1.09 0 .268-.106.53-.177.815-.106.09-.106.179-.212.268.954-.536 2.671-.268 2.671-.268v.815s-1.116.539-2.388.45c.106.27.106.535.212.814 0 .748 0 1.598-.177 2.235.965.894 1.39 1.994 1.39 3.13V11.288z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h4 className="font-medium">Salesforce</h4>
-                        <p className="text-sm text-muted-foreground">Connect with Salesforce to sync your CRM data.</p>
-                      </div>
+                    <div>
+                      <h4 className="font-medium">Zoom</h4>
+                      <p className="text-sm text-muted-foreground">Schedule and join Zoom meetings directly from leads.</p>
                     </div>
-                    <Switch 
-                      checked={integrations.salesforce} 
-                      onCheckedChange={() => toggleIntegration('salesforce')} 
-                    />
                   </div>
+                  <Switch 
+                    checked={integrations.zoom} 
+                    onCheckedChange={() => toggleIntegration('zoom')} 
+                  />
+                </div>
+                
+                {/* HubSpot Integration */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-orange-600" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18.766 0H7.323C3.849 0 1.025 2.12.179 5.414c-.105.414.21.828.631.828h7.648c.421 0 .737-.414.632-.828-.421-1.242-1.579-2.12-2.947-2.12h-.316v.414c0 1.449 1.158 2.535 2.526 2.535.842 0 1.579-.414 2-.934C10.985 6.655 12.144 7.38 13.513 7.38h4.492c1.368 0 2.525-1.14 2.525-2.534V2.535C20.53 1.14 19.814 0 18.766 0zM7.85 4.845c0 .414-.316.828-.842.828-.526 0-.842-.414-.842-.828 0-.413.316-.827.842-.827.526 0 .842.414.842.827zm10.143 0c0 .414-.316.828-.842.828-.526 0-.842-.414-.842-.828 0-.413.316-.827.842-.827.526 0 .842.414.842.827zM24 7.38c0 .414-.316.828-.737.828h-7.648c-.421 0-.736-.414-.631-.828.421-1.242 1.578-2.12 2.947-2.12h.315v.414c0 1.449-1.157 2.535-2.525 2.535-.842 0-1.579-.414-2-.934-.633 1.346-1.79 2.07-3.159 2.07H5.06c-1.368 0-2.526-1.14-2.526-2.535V4.656c0-1.449.737-2.535 1.79-2.535h11.438c3.474 0 6.298 2.12 7.144 5.414.105.414.421.828.842.828.42 0 .736-.414.631-.828C23.369 3.12 20.105 0 16.105 0h-10.2C2.632 0 0 2.656 0 5.897v1.657c0 3.242 2.632 5.897 5.895 5.897h3.79c1.474 0 2.841-.62 3.789-1.552.947.932 2.316 1.552 3.79 1.552h.736c3.263 0 5.895-2.656 5.895-5.897V5.897c.105-3.241-2.526-5.897-5.79-5.897H15.79c-1.474 0-2.842.62-3.79 1.552C11.053.62 9.685 0 8.21 0h-.736C5.527 0 3.79 1.242 2.948 3.104h-.631C1.053 3.104 0 4.242 0 5.69v.828c0 1.449 1.053 2.586 2.316 2.586h.631C3.79 11.034 5.527 12.28 7.474 12.28h.738c1.474 0 2.842-.622 3.79-1.553.947.931 2.315 1.553 3.789 1.553h.736c3.263 0 5.895-2.656 5.895-5.897V5.725c0-.413.316-.827.736-.827.421 0 .842.414.842.827v.621c0 .414-.316.828-.736.828-.421 0-.737.414-.637.828.106.414.422.828.843.828.947 0 1.684-.827 1.684-1.863V5.725c0-1.035-.737-1.863-1.684-1.863-.947 0-1.684.828-1.684 1.863v.621c0 2.414-1.894 4.38-4.21 4.38h-.737c-1.157 0-2.21-.621-2.842-1.553-.526-.621-1.052-1.035-1.789-1.035s-1.263.414-1.79 1.035c-.671-.179-1.39-.268-2.13-.268-.636 0-1.273.09-1.885.268-.989-.902-1.938-.724-1.938-.724s-.618.98-.088 1.99c-.854.45-1.391 1.209-1.391 2.219 0 1.77 1.497 2.595 2.982 2.772-.318.09-.636.268-.742.558-.212.287-.212.715-.106.983-1.03.09-.742-.724-.742-.742-.265-.451-.636-.63-.954-.63 0 0-.318.268 0 .45.318.178.318.45.53.714 0 0 .318.63 1.273.63.954 0 1.484-.09 1.802-.178.282 1.034 1.201 1.77 2.095 1.77.9 0 1.696-.736 1.979-1.77.318.09.83.178 1.803.178.954 0 1.272-.63 1.272-.63.212-.264.212-.536.53-.714.317-.182 0-.45 0-.45-.318 0-.69.179-.954.63 0-.002-.318.813-.742.724h-.002zm-3.512.787c-.53 0-.954-.724-1.06-.983-.107-.268-.107-.536-.107-.815h2.343c0 .279 0 .547-.106.815-.107.259-.53.983-1.07.983zm.636-4.743c-.43 0-.954-.268-.954-.696 0-.45.424-.697.954-.697.53 0 .954.268.954.697 0 .428-.425.696-.954.696zm5.115-1.168c0 .696-.107 1.278-.425 1.78-1.06 1.687-4.043 1.48-6.505 1.48-2.46 0-5.444.207-6.505-1.48-.318-.502-.425-1.084-.425-1.78 0-1.126.425-2.236 1.39-3.13-.177-.63-.177-1.48-.177-2.235.106-.268.106-.536.213-.815-1.273.09-2.39-.45-2.39-.45v-.814s1.732-.268 2.672.268c-.106-.09-.106-.179-.212-.268-.071-.27-.177-.54-.177-.815 0-.277 0-.8.106-1.09.106-.177.213-.268.319-.268h.53s.212.902.53 1.347c.318-.724.954-1.48.954-1.48s.636.756.954 1.48c.318-.445.53-1.347.53-1.347h.53c.106 0 .213.09.319.268.106.29.106.813.106 1.09 0 .268-.106.53-.177.815-.106.09-.106.179-.212.268.954-.536 2.671-.268 2.671-.268v.815s-1.116.539-2.388.45c.106.27.106.535.212.814 0 .748 0 1.598-.177 2.235.965.894 1.39 1.994 1.39 3.13V11.288z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-medium">HubSpot</h4>
+                      <p className="text-sm text-muted-foreground">Connect with HubSpot to sync your CRM data.</p>
+                    </div>
+                  </div>
+                  <Switch 
+                    checked={integrations.hubspot} 
+                    onCheckedChange={() => toggleIntegration('hubspot')} 
+                  />
                 </div>
               </CardContent>
+              <CardFooter className="flex justify-end">
+                <Button onClick={updateIntegrationSettings} disabled={isLoading.integrations}>Save Integrations</Button>
+              </CardFooter>
             </Card>
           </TabsContent>
           
-{/* Team Settings */}
-<TabsContent value="team">
-  {isAdmin() ? (
-    <Card>
-      <CardHeader>
-        <CardTitle>Team Management</CardTitle>
-        <CardDescription>
-          Add and manage team members and their access levels.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Current Team Members */}
-        <div>
-          <h3 className="text-lg font-medium mb-4">Current Team Members</h3>
-          {teamMembers.map(member => (
-            <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg mb-2">
-              <div className="flex items-center gap-4">
-                <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                  <span className="text-lg font-semibold text-gray-600">
-                    {member.name.split(' ').map(n => n[0]).join('')}
-                  </span>
-                </div>
-                <div>
-                  <h4 className="font-medium">{member.name}</h4>
-                  <p className="text-sm text-muted-foreground">{member.email}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Select defaultValue={member.role}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="agent">Agent</SelectItem>
-                  </SelectContent>
-                </Select>
-                
-                {member.id !== '1' && (
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                    onClick={() => removeTeamMember(member.id)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </Button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Pending Invitations */}
-        <div className="mt-8">
-          <h3 className="text-lg font-medium mb-4">Pending Invitations</h3>
-          {pendingInvitations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No pending invitations</p>
-          ) : (
-            pendingInvitations.map(invitation => (
-              <div key={invitation.id} className="flex items-center justify-between p-4 border rounded-lg mb-2">
-                <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  </div>
+          {/* Team Settings */}
+          <TabsContent value="team">
+            {isAdmin() ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Team Management</CardTitle>
+                  <CardDescription>
+                    Add and manage team members and their access levels.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Current Team Members */}
                   <div>
-                    <h4 className="font-medium">{invitation.email}</h4>
-                    <p className="text-sm text-muted-foreground">Role: {invitation.role} • Expires: {new Date(invitation.expiresAt).toLocaleDateString()}</p>
+                    <h3 className="text-lg font-medium mb-4">Current Team Members</h3>
+                    {teamMembers.map(member => (
+                      <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg mb-2">
+                        <div className="flex items-center gap-4">
+                          <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                            <span className="text-lg font-semibold text-gray-600">
+                              {member.name.split(' ').map(n => n[0]).join('')}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className="font-medium">{member.name}</h4>
+                            <p className="text-sm text-muted-foreground">{member.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Select 
+                            defaultValue={member.role}
+                            onValueChange={(value) => updateTeamMemberRole(member.id, value)}
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue placeholder="Select role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="manager">Manager</SelectItem>
+                              <SelectItem value="agent">Agent</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          
+                          {member.id !== '1' && (
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => removeTeamMember(member.id)}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => copyInvitationLink(invitation.token)}
-                  >
-                    Copy Link
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => resendInvitation(invitation.id)}
-                  >
-                    Resend
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                    onClick={() => deleteInvitation(invitation.id)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
 
-        {/* Invite New User Form */}
-        <div className="mt-8">
-          <h3 className="text-lg font-medium mb-4">Invite New Team Member</h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="invite-email">Email</Label>
-              <Input 
-                id="invite-email"
-                type="email"
-                value={newInvitation.email}
-                onChange={(e) => setNewInvitation({...newInvitation, email: e.target.value})}
-                placeholder="colleague@example.com"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="invite-role">Role</Label>
-              <Select 
-                value={newInvitation.role} 
-                onValueChange={(value) => setNewInvitation({...newInvitation, role: value})}
-              >
-                <SelectTrigger id="invite-role">
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
-                  <SelectItem value="agent">Agent</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
-              <Button 
-                className="w-full"
-                onClick={sendInvitation}
-                disabled={!newInvitation.email || !newInvitation.role || isInviting}
-              >
-                {isInviting ? 'Sending...' : 'Send Invitation'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  ) : (
-    <Card>
-      <CardHeader>
-        <CardTitle>Team Management</CardTitle>
-        <CardDescription>
-          You don't have permission to access team management.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-muted-foreground">
-          Only administrators can manage team members and invitations. Please contact your administrator if you need access.
-        </p>
-      </CardContent>
-    </Card>
-  )}
-</TabsContent>
+                  {/* Pending Invitations */}
+                  <div className="mt-8">
+                    <h3 className="text-lg font-medium mb-4">Pending Invitations</h3>
+                    {pendingInvitations.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No pending invitations</p>
+                    ) : (
+                      pendingInvitations.map(invitation => (
+                        <div key={invitation.id} className="flex items-center justify-between p-4 border rounded-lg mb-2">
+                          <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <h4 className="font-medium">{invitation.email}</h4>
+                              <p className="text-sm text-muted-foreground">Role: {invitation.role} • Expires: {new Date(invitation.expiresAt).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => copyInvitationLink(invitation.token)}
+                            >
+                              Copy Link
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => resendInvitation(invitation.id)}
+                            >
+                              Resend
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => deleteInvitation(invitation.id)}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Invite New User Form */}
+                  <div className="mt-8">
+                    <h3 className="text-lg font-medium mb-4">Invite New Team Member</h3>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="invite-email">Email</Label>
+                        <Input 
+                          id="invite-email"
+                          type="email"
+                          value={newInvitation.email}
+                          onChange={(e) => setNewInvitation({...newInvitation, email: e.target.value})}
+                          placeholder="colleague@example.com"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="invite-role">Role</Label>
+                        <Select 
+                          value={newInvitation.role} 
+                          onValueChange={(value) => setNewInvitation({...newInvitation, role: value})}
+                        >
+                          <SelectTrigger id="invite-role">
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="agent">Agent</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-end">
+                        <Button 
+                          className="w-full"
+                          onClick={sendInvitation}
+                          disabled={!newInvitation.email || !newInvitation.role || isInviting}
+                        >
+                          {isInviting ? 'Sending...' : 'Send Invitation'}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Team Management</CardTitle>
+                  <CardDescription>
+                    You don't have permission to access team management.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">
+                    Only administrators can manage team members and invitations. Please contact your administrator if you need access.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
