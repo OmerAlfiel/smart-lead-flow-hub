@@ -1,19 +1,31 @@
 // client/src/services/leads.service.ts
-import api from './api';
-import { Lead } from '@/types/leads';
+
+import api from '@/services/api';
+import { Lead, Note } from '@/types/leads';
 
 export interface CreateLeadData {
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone?: string;
   company?: string;
-  status: string;
+  status?: string;
   value?: number;
   source?: string;
+  notes?: string;
 }
 
-export interface UpdateLeadData extends Partial<CreateLeadData> {
+export interface UpdateLeadData {
   id: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  company?: string;
+  status?: string;
+  value?: number;
+  source?: string;
+  notes?: string | Note[];
 }
 
 const LeadsService = {
@@ -34,7 +46,28 @@ const LeadsService = {
   
   updateLead: async (data: UpdateLeadData): Promise<Lead> => {
     const { id, ...updateData } = data;
-    const response = await api.patch(`/leads/${id}`, updateData);
+    
+    // Ensure we're sending the right data format
+    const cleanedData = {
+      firstName: updateData.firstName,
+      lastName: updateData.lastName,
+      email: updateData.email,
+      phone: updateData.phone,
+      company: updateData.company,
+      status: updateData.status,
+      value: updateData.value,
+      source: updateData.source,
+      // Server expects notes as a string
+      notes: typeof updateData.notes === 'string' ? updateData.notes : undefined
+    };
+    
+    // Only include defined fields
+    const finalData = Object.fromEntries(
+      Object.entries(cleanedData).filter(([_, value]) => value !== undefined)
+    );
+    
+    console.log('Sending to server:', finalData);
+    const response = await api.patch(`/leads/${id}`, finalData);
     return response.data;
   },
   

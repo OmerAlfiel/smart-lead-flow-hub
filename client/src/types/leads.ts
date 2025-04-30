@@ -1,9 +1,10 @@
-
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
 
 export interface Lead {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
+  name?: string;
   email: string;
   phone?: string;
   company?: string;
@@ -11,9 +12,12 @@ export interface Lead {
   value?: number;
   source?: string;
   assignedTo?: string;
+  assignedToId?: string;
+  score?: number;
+  notes?: string | Note[];
+  metadata?: Record<string, any>;
   createdAt: string;
   updatedAt: string;
-  notes?: Note[];
 }
 
 export interface Note {

@@ -1,3 +1,4 @@
+// client/src/pages/Leads.tsx
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import LeadCard from '@/components/leads/LeadCard';
@@ -5,9 +6,9 @@ import LeadForm from '@/components/leads/LeadForm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { mockLeads } from '@/data/mockLeads';
 import { Lead, LeadStatus } from '@/types/leads';
 import { useToast } from '@/hooks/use-toast';
+import LeadsService from '@/services/leads.service';
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -18,12 +19,10 @@ import {
   AlertDialogHeader, 
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
-import { v4 as uuidv4 } from 'uuid';
-import LeadsService from '@/services/leads.service';
 
 const Leads: React.FC = () => {
-  const [leads, setLeads] = useState<Lead[]>(mockLeads);
-  const [filteredLeads, setFilteredLeads] = useState<Lead[]>(mockLeads);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -75,7 +74,9 @@ const Leads: React.FC = () => {
     // Apply search term filter
     if (term) {
       filtered = filtered.filter(lead => 
-        lead.name.toLowerCase().includes(term) ||
+        (lead.firstName && lead.firstName.toLowerCase().includes(term)) ||
+        (lead.lastName && lead.lastName.toLowerCase().includes(term)) ||
+        (lead.name && lead.name.toLowerCase().includes(term)) ||
         lead.email.toLowerCase().includes(term) ||
         (lead.company && lead.company.toLowerCase().includes(term))
       );
@@ -138,30 +139,70 @@ const Leads: React.FC = () => {
     try {
       if (currentLead) {
         // Update existing lead
-        const updatedLead = await LeadsService.updateLead({
+        // Extract only the fields expected by the server and ensure correct types
+        const updateLeadData = {
           id: currentLead.id,
-          ...leadData
-        });
+          firstName: leadData.firstName || '',
+          lastName: leadData.lastName || '',
+          email: leadData.email || '',
+          phone: leadData.phone || '',
+          company: leadData.company || '',
+          status: leadData.status || 'new',
+          value: typeof leadData.value === 'number' ? leadData.value : undefined,
+          source: leadData.source || '',
+          notes: typeof leadData.notes === 'string' ? leadData.notes : ''
+        };
         
-        const updatedLeads = leads.map(lead => 
-          lead.id === currentLead.id ? updatedLead : lead
-        );
-        
-        setLeads(updatedLeads);
-        setFilteredLeads(updatedLeads.filter(lead => 
-          (statusFilter === 'all' || lead.status === statusFilter) &&
-          (lead.name.toLowerCase().includes(searchTerm) ||
-           lead.email.toLowerCase().includes(searchTerm) ||
-           (lead.company && lead.company.toLowerCase().includes(searchTerm)))
-        ));
-        
-        toast({
-          title: "Lead updated",
-          description: "The lead has been updated successfully.",
-        });
+        try {
+          const updatedLead = await LeadsService.updateLead(updateLeadData);
+          
+          const updatedLeads = leads.map(lead => 
+            lead.id === currentLead.id ? updatedLead : lead
+          );
+          
+          setLeads(updatedLeads);
+          setFilteredLeads(updatedLeads.filter(lead => 
+            (statusFilter === 'all' || lead.status === statusFilter) &&
+            ((lead.firstName && lead.firstName.toLowerCase().includes(searchTerm)) ||
+             (lead.lastName && lead.lastName.toLowerCase().includes(searchTerm)) ||
+             (lead.name && lead.name.toLowerCase().includes(searchTerm)) ||
+             lead.email.toLowerCase().includes(searchTerm) ||
+             (lead.company && lead.company.toLowerCase().includes(searchTerm)))
+          ));
+          
+          toast({
+            title: "Lead updated",
+            description: "The lead has been updated successfully.",
+          });
+        } catch (error) {
+          console.error('Error updating lead:', error);
+          // Check if we can get more details from the error
+          if (error.response) {
+            console.error('Server response data:', error.response.data);
+            console.error('Server response status:', error.response.status);
+          }
+          toast({
+            title: "Error",
+            description: "Failed to update lead. Please check the console for details.",
+            variant: "destructive",
+          });
+        }
       } else {
         // Add new lead
-        const newLead = await LeadsService.createLead(leadData as Omit<Lead, 'id'>);
+        // Extract only the fields expected by the server
+        const createLeadData = {
+          firstName: leadData.firstName || '',
+          lastName: leadData.lastName || '',
+          email: leadData.email || '',
+          phone: leadData.phone || '',
+          company: leadData.company || '',
+          status: leadData.status || 'new',
+          value: typeof leadData.value === 'number' ? leadData.value : undefined,
+          source: leadData.source || '',
+          notes: typeof leadData.notes === 'string' ? leadData.notes : ''
+        };
+        
+        const newLead = await LeadsService.createLead(createLeadData);
         
         const updatedLeads = [...leads, newLead];
         setLeads(updatedLeads);
@@ -169,7 +210,9 @@ const Leads: React.FC = () => {
         // Apply current filters to the updated leads
         const shouldInclude = 
           (statusFilter === 'all' || newLead.status === statusFilter) &&
-          (newLead.name.toLowerCase().includes(searchTerm) ||
+          ((newLead.firstName && newLead.firstName.toLowerCase().includes(searchTerm)) ||
+           (newLead.lastName && newLead.lastName.toLowerCase().includes(searchTerm)) ||
+           (newLead.name && newLead.name.toLowerCase().includes(searchTerm)) ||
            newLead.email.toLowerCase().includes(searchTerm) ||
            (newLead.company && newLead.company.toLowerCase().includes(searchTerm)));
         
@@ -249,7 +292,11 @@ const Leads: React.FC = () => {
           </div>
         </div>
         
-        {filteredLeads.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <p>Loading leads...</p>
+          </div>
+        ) : filteredLeads.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center">
             <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-muted-foreground mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

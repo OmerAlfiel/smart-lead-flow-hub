@@ -1,5 +1,5 @@
 // client/src/services/tasks.service.ts
-import api from './api';
+import api from '@/services/api';
 
 export interface Task {
   id: string;

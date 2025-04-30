@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,7 +48,11 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onEdit, onDelete }) => {
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="font-semibold text-lg">{lead.name}</h3>
+            <h3 className="font-semibold text-lg">
+              {lead.firstName && lead.lastName 
+                ? `${lead.firstName} ${lead.lastName}` 
+                : lead.name || 'Unnamed Lead'}
+            </h3>
             <p className="text-sm text-muted-foreground">{lead.company || 'No company'}</p>
           </div>
           <Badge className={getStatusColor(lead.status)}>

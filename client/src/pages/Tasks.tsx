@@ -1,5 +1,5 @@
-
-import React, { useState } from 'react';
+// client/src/pages/Tasks.tsx
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,64 +17,55 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { v4 as uuidv4 } from 'uuid';
-
-interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  dueDate?: string;
-  priority: 'low' | 'medium' | 'high';
-  leadId?: string;
-  leadName?: string;
-  completed: boolean;
-}
+import TasksService, { Task, CreateTaskData } from '@/services/tasks.service';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from '@/components/ui/alert-dialog';
 
 const Tasks: React.FC = () => {
-  // Mock data for tasks
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: '1',
-      title: 'Follow up with Michael Johnson',
-      description: 'Send proposal details and schedule a demo',
-      dueDate: '2025-05-02',
-      priority: 'high',
-      leadId: '123',
-      leadName: 'Michael Johnson',
-      completed: false
-    },
-    {
-      id: '2',
-      title: 'Prepare presentation for Acme Inc',
-      description: 'Review requirements and prepare slides',
-      dueDate: '2025-05-05',
-      priority: 'medium',
-      leadId: '456',
-      leadName: 'Acme Inc',
-      completed: false
-    },
-    {
-      id: '3',
-      title: 'Call Sarah Smith',
-      description: 'Discuss new product features',
-      dueDate: '2025-05-01',
-      priority: 'low',
-      leadId: '789',
-      leadName: 'Sarah Smith',
-      completed: true
-    }
-  ]);
-  
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
-  const [newTask, setNewTask] = useState<Partial<Task>>({
+  const [newTask, setNewTask] = useState<Partial<CreateTaskData>>({
     title: '',
     description: '',
     dueDate: '',
     priority: 'medium',
-    completed: false
+    status: 'pending'
   });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<string>('');
   
   const { toast } = useToast();
+
+  // Fetch tasks from API
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        setIsLoading(true);
+        const data = await TasksService.getAllTasks();
+        setTasks(data);
+      } catch (error) {
+        console.error('Error fetching tasks:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load tasks. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTasks();
+  }, []);
 
   const handleAddTask = () => {
     setNewTask({
@@ -82,12 +73,12 @@ const Tasks: React.FC = () => {
       description: '',
       dueDate: '',
       priority: 'medium',
-      completed: false
+      status: 'pending'
     });
     setIsAddTaskOpen(true);
   };
 
-  const handleSaveTask = () => {
+  const handleSaveTask = async () => {
     if (!newTask.title) {
       toast({
         title: "Task title required",
@@ -97,47 +88,79 @@ const Tasks: React.FC = () => {
       return;
     }
 
-    const taskToAdd: Task = {
-      id: uuidv4(),
-      title: newTask.title || '',
-      description: newTask.description,
-      dueDate: newTask.dueDate,
-      priority: newTask.priority as 'low' | 'medium' | 'high',
-      leadId: newTask.leadId,
-      leadName: newTask.leadName,
-      completed: false
-    };
-
-    setTasks([...tasks, taskToAdd]);
-    setIsAddTaskOpen(false);
-    
-    toast({
-      title: "Task added",
-      description: "The task has been added successfully"
-    });
+    try {
+      const createdTask = await TasksService.createTask(newTask as CreateTaskData);
+      setTasks([...tasks, createdTask]);
+      setIsAddTaskOpen(false);
+      
+      toast({
+        title: "Task added",
+        description: "The task has been added successfully"
+      });
+    } catch (error) {
+      console.error('Error creating task:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create task. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const toggleTaskCompletion = (taskId: string) => {
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, completed: !task.completed } : task
-    ));
-    
-    const task = tasks.find(t => t.id === taskId);
-    
-    toast({
-      title: task?.completed ? "Task marked as incomplete" : "Task completed",
-      description: `"${task?.title}" has been updated`
-    });
+  const toggleTaskCompletion = async (taskId: string) => {
+    try {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+      
+      const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+      
+      await TasksService.updateTask({
+        id: taskId,
+        status: newStatus
+      });
+      
+      setTasks(tasks.map(t => 
+        t.id === taskId ? { ...t, status: newStatus } : t
+      ));
+      
+      toast({
+        title: newStatus === 'completed' ? "Task completed" : "Task marked as incomplete",
+        description: `"${task.title}" has been updated`
+      });
+    } catch (error) {
+      console.error('Error updating task:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update task status. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const deleteTask = (taskId: string) => {
-    const filteredTasks = tasks.filter(task => task.id !== taskId);
-    setTasks(filteredTasks);
-    
-    toast({
-      title: "Task deleted",
-      description: "The task has been deleted successfully"
-    });
+  const handleDeleteTask = (taskId: string) => {
+    setTaskToDelete(taskId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteTask = async () => {
+    try {
+      await TasksService.deleteTask(taskToDelete);
+      setTasks(tasks.filter(task => task.id !== taskToDelete));
+      
+      toast({
+        title: "Task deleted",
+        description: "The task has been deleted successfully"
+      });
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete task. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleteDialogOpen(false);
+    }
   };
 
   const getPriorityColor = (priority: string) => {
@@ -151,25 +174,25 @@ const Tasks: React.FC = () => {
 
   // Filter tasks
   const overdueTasks = tasks.filter(task => 
-    !task.completed && 
+    task.status !== 'completed' && 
     task.dueDate && 
     new Date(task.dueDate) < new Date()
   );
   
   const todayTasks = tasks.filter(task => 
-    !task.completed && 
+    task.status !== 'completed' && 
     task.dueDate && 
     new Date(task.dueDate).toDateString() === new Date().toDateString()
   );
   
   const upcomingTasks = tasks.filter(task => 
-    !task.completed && 
+    task.status !== 'completed' && 
     task.dueDate && 
     new Date(task.dueDate) > new Date() &&
     new Date(task.dueDate).toDateString() !== new Date().toDateString()
   );
   
-  const completedTasks = tasks.filter(task => task.completed);
+  const completedTasks = tasks.filter(task => task.status === 'completed');
 
   return (
     <DashboardLayout>
@@ -189,219 +212,227 @@ const Tasks: React.FC = () => {
           </Button>
         </div>
         
-        {overdueTasks.length > 0 && (
-          <Card>
-            <CardHeader className="bg-red-50">
-              <CardTitle className="text-red-700">Overdue</CardTitle>
-            </CardHeader>
-            <CardContent className="divide-y">
-              {overdueTasks.map(task => (
-                <div key={task.id} className="py-4 flex items-start justify-between">
-                  <div className="flex items-start space-x-3">
-                    <Checkbox 
-                      id={`task-${task.id}`}
-                      checked={task.completed}
-                      onCheckedChange={() => toggleTaskCompletion(task.id)}
-                      className="mt-1"
-                    />
-                    <div>
-                      <label 
-                        htmlFor={`task-${task.id}`}
-                        className="font-medium cursor-pointer"
-                      >
-                        {task.title}
-                      </label>
-                      {task.description && (
-                        <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
-                      )}
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
-                          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                        </span>
-                        {task.dueDate && (
-                          <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-800">
-                            Due: {new Date(task.dueDate).toLocaleDateString()}
-                          </span>
-                        )}
-                        {task.leadName && (
-                          <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-                            {task.leadName}
-                          </span>
-                        )}
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <p>Loading tasks...</p>
+          </div>
+        ) : (
+          <>
+            {overdueTasks.length > 0 && (
+              <Card>
+                <CardHeader className="bg-red-50">
+                  <CardTitle className="text-red-700">Overdue</CardTitle>
+                </CardHeader>
+                <CardContent className="divide-y">
+                  {overdueTasks.map(task => (
+                    <div key={task.id} className="py-4 flex items-start justify-between">
+                      <div className="flex items-start space-x-3">
+                        <Checkbox 
+                          id={`task-${task.id}`}
+                          checked={task.status === 'completed'}
+                          onCheckedChange={() => toggleTaskCompletion(task.id)}
+                          className="mt-1"
+                        />
+                        <div>
+                          <label 
+                            htmlFor={`task-${task.id}`}
+                            className="font-medium cursor-pointer"
+                          >
+                            {task.title}
+                          </label>
+                          {task.description && (
+                            <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
+                          )}
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
+                              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                            </span>
+                            {task.dueDate && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-800">
+                                Due: {new Date(task.dueDate).toLocaleDateString()}
+                              </span>
+                            )}
+                            {task.relatedTo && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                                {task.relatedTo.type}: {task.relatedTo.id}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => deleteTask(task.id)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-        
-        {todayTasks.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Today</CardTitle>
-            </CardHeader>
-            <CardContent className="divide-y">
-              {todayTasks.map(task => (
-                <div key={task.id} className="py-4 flex items-start justify-between">
-                  <div className="flex items-start space-x-3">
-                    <Checkbox 
-                      id={`task-${task.id}`}
-                      checked={task.completed}
-                      onCheckedChange={() => toggleTaskCompletion(task.id)}
-                      className="mt-1"
-                    />
-                    <div>
-                      <label 
-                        htmlFor={`task-${task.id}`}
-                        className="font-medium cursor-pointer"
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDeleteTask(task.id)}
                       >
-                        {task.title}
-                      </label>
-                      {task.description && (
-                        <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
-                      )}
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
-                          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                        </span>
-                        {task.leadName && (
-                          <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-                            {task.leadName}
-                          </span>
-                        )}
-                      </div>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </Button>
                     </div>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => deleteTask(task.id)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-        
-        {upcomingTasks.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Upcoming</CardTitle>
-            </CardHeader>
-            <CardContent className="divide-y">
-              {upcomingTasks.map(task => (
-                <div key={task.id} className="py-4 flex items-start justify-between">
-                  <div className="flex items-start space-x-3">
-                    <Checkbox 
-                      id={`task-${task.id}`}
-                      checked={task.completed}
-                      onCheckedChange={() => toggleTaskCompletion(task.id)}
-                      className="mt-1"
-                    />
-                    <div>
-                      <label 
-                        htmlFor={`task-${task.id}`}
-                        className="font-medium cursor-pointer"
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+            
+            {todayTasks.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Today</CardTitle>
+                </CardHeader>
+                <CardContent className="divide-y">
+                  {todayTasks.map(task => (
+                    <div key={task.id} className="py-4 flex items-start justify-between">
+                      <div className="flex items-start space-x-3">
+                        <Checkbox 
+                          id={`task-${task.id}`}
+                          checked={task.status === 'completed'}
+                          onCheckedChange={() => toggleTaskCompletion(task.id)}
+                          className="mt-1"
+                        />
+                        <div>
+                          <label 
+                            htmlFor={`task-${task.id}`}
+                            className="font-medium cursor-pointer"
+                          >
+                            {task.title}
+                          </label>
+                          {task.description && (
+                            <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
+                          )}
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
+                              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                            </span>
+                            {task.relatedTo && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                                {task.relatedTo.type}: {task.relatedTo.id}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDeleteTask(task.id)}
                       >
-                        {task.title}
-                      </label>
-                      {task.description && (
-                        <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
-                      )}
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
-                          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                        </span>
-                        {task.dueDate && (
-                          <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-800">
-                            Due: {new Date(task.dueDate).toLocaleDateString()}
-                          </span>
-                        )}
-                        {task.leadName && (
-                          <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-                            {task.leadName}
-                          </span>
-                        )}
-                      </div>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </Button>
                     </div>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => deleteTask(task.id)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-        
-        {completedTasks.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Completed</CardTitle>
-            </CardHeader>
-            <CardContent className="divide-y">
-              {completedTasks.map(task => (
-                <div key={task.id} className="py-4 flex items-start justify-between opacity-70">
-                  <div className="flex items-start space-x-3">
-                    <Checkbox 
-                      id={`task-${task.id}`}
-                      checked={task.completed}
-                      onCheckedChange={() => toggleTaskCompletion(task.id)}
-                      className="mt-1"
-                    />
-                    <div>
-                      <label 
-                        htmlFor={`task-${task.id}`}
-                        className="font-medium cursor-pointer line-through"
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+            
+            {upcomingTasks.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Upcoming</CardTitle>
+                </CardHeader>
+                <CardContent className="divide-y">
+                  {upcomingTasks.map(task => (
+                    <div key={task.id} className="py-4 flex items-start justify-between">
+                      <div className="flex items-start space-x-3">
+                        <Checkbox 
+                          id={`task-${task.id}`}
+                          checked={task.status === 'completed'}
+                          onCheckedChange={() => toggleTaskCompletion(task.id)}
+                          className="mt-1"
+                        />
+                        <div>
+                          <label 
+                            htmlFor={`task-${task.id}`}
+                            className="font-medium cursor-pointer"
+                          >
+                            {task.title}
+                          </label>
+                          {task.description && (
+                            <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
+                          )}
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
+                              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                            </span>
+                            {task.dueDate && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-800">
+                                Due: {new Date(task.dueDate).toLocaleDateString()}
+                              </span>
+                            )}
+                            {task.relatedTo && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                                {task.relatedTo.type}: {task.relatedTo.id}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDeleteTask(task.id)}
                       >
-                        {task.title}
-                      </label>
-                      {task.description && (
-                        <p className="text-sm text-muted-foreground mt-1 line-through">{task.description}</p>
-                      )}
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {task.leadName && (
-                          <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 opacity-50">
-                            {task.leadName}
-                          </span>
-                        )}
-                      </div>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </Button>
                     </div>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => deleteTask(task.id)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+            
+            {completedTasks.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Completed</CardTitle>
+                </CardHeader>
+                <CardContent className="divide-y">
+                  {completedTasks.map(task => (
+                    <div key={task.id} className="py-4 flex items-start justify-between opacity-70">
+                      <div className="flex items-start space-x-3">
+                        <Checkbox 
+                          id={`task-${task.id}`}
+                          checked={true}
+                          onCheckedChange={() => toggleTaskCompletion(task.id)}
+                          className="mt-1"
+                        />
+                        <div>
+                          <label 
+                            htmlFor={`task-${task.id}`}
+                            className="font-medium cursor-pointer line-through"
+                          >
+                            {task.title}
+                          </label>
+                          {task.description && (
+                            <p className="text-sm text-muted-foreground mt-1 line-through">{task.description}</p>
+                          )}
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {task.relatedTo && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 opacity-50">
+                                {task.relatedTo.type}: {task.relatedTo.id}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDeleteTask(task.id)}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </Button>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </>
         )}
       </div>
 
@@ -461,12 +492,18 @@ const Tasks: React.FC = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="leadName">Associated Lead (optional)</Label>
+              <Label htmlFor="relatedTo">Associated Lead ID (optional)</Label>
               <Input 
-                id="leadName"
-                value={newTask.leadName || ''}
-                onChange={(e) => setNewTask({...newTask, leadName: e.target.value})}
-                placeholder="Enter lead name"
+                id="relatedTo"
+                value={newTask.relatedTo?.id || ''}
+                onChange={(e) => setNewTask({
+                  ...newTask, 
+                  relatedTo: { 
+                    type: 'lead', 
+                    id: e.target.value 
+                  }
+                })}
+                placeholder="Enter lead ID"
               />
             </div>
           </div>
@@ -476,6 +513,21 @@ const Tasks: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the task.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteTask}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };

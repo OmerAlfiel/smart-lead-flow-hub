@@ -1,5 +1,5 @@
 // client/src/services/analytics.service.ts
-import api from './api';
+import api from '@/services/api';
 
 export interface LeadStats {
   total: number;

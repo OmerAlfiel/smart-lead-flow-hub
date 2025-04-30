@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
@@ -40,43 +39,62 @@ const statusOptions: { value: LeadStatus; label: string }[] = [
 const LeadForm: React.FC<LeadFormProps> = ({ isOpen, onClose, onSave, lead }) => {
   const { toast } = useToast();
   const [formData, setFormData] = useState<Partial<Lead>>({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
     company: '',
     status: 'new',
     value: undefined,
     source: '',
+    notes: '',
   });
 
   // Load lead data when editing
   useEffect(() => {
     if (lead) {
+      // Split name into firstName and lastName if needed
+      let firstName = '';
+      let lastName = '';
+      
+      if (lead.name) {
+        const nameParts = lead.name.split(' ');
+        firstName = nameParts[0] || '';
+        lastName = nameParts.slice(1).join(' ') || '';
+      } else {
+        firstName = lead.firstName || '';
+        lastName = lead.lastName || '';
+      }
+      
       setFormData({
         id: lead.id,
-        name: lead.name,
+        firstName,
+        lastName,
         email: lead.email,
         phone: lead.phone || '',
         company: lead.company || '',
         status: lead.status,
         value: lead.value,
         source: lead.source || '',
+        notes: lead.notes || '',
       });
     } else {
       // Reset form when adding new lead
       setFormData({
-        name: '',
+        firstName: '',
+        lastName: '',
         email: '',
         phone: '',
         company: '',
         status: 'new',
         value: undefined,
         source: '',
+        notes: '',
       });
     }
   }, [lead, isOpen]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -95,10 +113,10 @@ const LeadForm: React.FC<LeadFormProps> = ({ isOpen, onClose, onSave, lead }) =>
     e.preventDefault();
     
     // Validate form
-    if (!formData.name || !formData.email) {
+    if (!formData.firstName || !formData.lastName || !formData.email) {
       toast({
         title: "Error",
-        description: "Name and email are required fields.",
+        description: "First name, last name, and email are required fields.",
         variant: "destructive",
       });
       return;
@@ -128,13 +146,26 @@ const LeadForm: React.FC<LeadFormProps> = ({ isOpen, onClose, onSave, lead }) =>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Name *
+              <Label htmlFor="firstName" className="text-right">
+                First Name *
               </Label>
               <Input
-                id="name"
-                name="name"
-                value={formData.name}
+                id="firstName"
+                name="firstName"
+                value={formData.firstName}
+                onChange={handleChange}
+                className="col-span-3"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="lastName" className="text-right">
+                Last Name *
+              </Label>
+              <Input
+                id="lastName"
+                name="lastName"
+                value={formData.lastName}
                 onChange={handleChange}
                 className="col-span-3"
                 required
@@ -221,6 +252,18 @@ const LeadForm: React.FC<LeadFormProps> = ({ isOpen, onClose, onSave, lead }) =>
                 value={formData.source}
                 onChange={handleChange}
                 className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="notes" className="text-right">
+                Notes
+              </Label>
+              <textarea
+                id="notes"
+                name="notes"
+                value={typeof formData.notes === 'string' ? formData.notes : ''}
+                onChange={handleChange}
+                className="col-span-3 min-h-[100px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
           </div>
