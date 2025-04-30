@@ -89,7 +89,26 @@ const Tasks: React.FC = () => {
     }
 
     try {
-      const createdTask = await TasksService.createTask(newTask as CreateTaskData);
+      // Create a minimal valid task with only the required fields
+      const taskData = {
+        title: newTask.title,
+        priority: newTask.priority || 'medium',
+        completed: false
+      };
+      
+      // Add optional fields only if they have valid values
+      if (newTask.description) {
+        taskData['description'] = newTask.description;
+      }
+      
+      if (newTask.dueDate) {
+        // Ensure date is in ISO format
+        taskData['dueDate'] = new Date(newTask.dueDate).toISOString();
+      }
+      
+      console.log('Sending minimal task data to server:', taskData);
+      
+      const createdTask = await TasksService.createTask(taskData as any);
       setTasks([...tasks, createdTask]);
       setIsAddTaskOpen(false);
       
@@ -112,19 +131,27 @@ const Tasks: React.FC = () => {
       const task = tasks.find(t => t.id === taskId);
       if (!task) return;
       
-      const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+      // Convert status to completed boolean
+      const isCompleted = task.status === 'completed';
+      const newCompleted = !isCompleted;
       
-      await TasksService.updateTask({
+      // Create a minimal valid update payload
+      const updateData = {
         id: taskId,
-        status: newStatus
-      });
+        completed: newCompleted
+      };
       
+      console.log('Sending task update to server:', updateData);
+      
+      await TasksService.updateTask(updateData);
+      
+      // Update local state with the new status
       setTasks(tasks.map(t => 
-        t.id === taskId ? { ...t, status: newStatus } : t
+        t.id === taskId ? { ...t, status: newCompleted ? 'completed' : 'pending' } : t
       ));
       
       toast({
-        title: newStatus === 'completed' ? "Task completed" : "Task marked as incomplete",
+        title: newCompleted ? "Task completed" : "Task marked as incomplete",
         description: `"${task.title}" has been updated`
       });
     } catch (error) {
