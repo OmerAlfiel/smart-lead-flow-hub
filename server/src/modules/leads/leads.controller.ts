@@ -87,4 +87,11 @@ export class LeadsController {
   removeNoteFromLead(@Param('noteId') noteId: string) {
     return this.leadsService.removeNoteFromLead(noteId);
   }
+
+  @Get('stats/by-status')
+  @ApiOperation({ summary: 'Get lead statistics by status' })
+  @ApiResponse({ status: 200, description: 'Return lead counts by status' })
+  getLeadStatsByStatus() {
+    return this.leadsService.getLeadStatsByStatus();
+  }
 }
