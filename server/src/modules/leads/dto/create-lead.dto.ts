@@ -42,6 +42,16 @@ export class CreateLeadDto {
   @IsNumber()
   score?: number;
 
+  @ApiPropertyOptional({ example: 5000 })
+  @IsOptional()
+  @IsNumber()
+  value?: number;
+
+  @ApiPropertyOptional({ example: 'Website' })
+  @IsOptional()
+  @IsString()
+  source?: string;
+
   @ApiPropertyOptional({ example: '123e4567-e89b-12d3-a456-426614174000' })
   @IsOptional()
   @IsString()

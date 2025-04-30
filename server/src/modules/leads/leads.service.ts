@@ -9,8 +9,6 @@ import { LeadRepository } from './repositories/lead.repository';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/entities/user.entity';
 import { NotesService } from '../notes/notes.service';
-import { CreateNoteDto } from '../notes/dto/create-note.dto';
-import { Note } from '../notes/entities/note.entity';
 
 @Injectable()
 export class LeadsService {
@@ -24,7 +22,7 @@ export class LeadsService {
     private notesService: NotesService,
   ) {}
 
-  async create(createLeadDto: CreateLeadDto): Promise<Lead> {
+  async create(createLeadDto: CreateLeadDto): Promise<any> {
     // Create a clean object with only the properties that match the Lead entity
     const leadData: Partial<Lead> = {
       firstName: createLeadDto.firstName,
@@ -34,6 +32,8 @@ export class LeadsService {
       company: createLeadDto.company,
       status: createLeadDto.status,
       score: createLeadDto.score,
+      value: createLeadDto.value,
+      source: createLeadDto.source,
       metadata: createLeadDto.metadata,
       // Map notes string to notesText
       notesText: createLeadDto.notes,
@@ -61,17 +61,23 @@ export class LeadsService {
       });
     }
     
-    return savedLead;
+    return this.transformLeadForClient(savedLead);
   }
 
-  async findAll(status?: string): Promise<Lead[]> {
+  async findAll(status?: string): Promise<any[]> {
+    let leads: Lead[];
+    
     if (status) {
-      return this.leadRepository.findByStatus(status);
+      leads = await this.leadRepository.findByStatus(status);
+    } else {
+      leads = await this.leadsRepository.find();
     }
-    return this.leadsRepository.find();
+    
+    // Transform leads to match client expectations
+    return leads.map(lead => this.transformLeadForClient(lead));
   }
 
-  async findOne(id: string): Promise<Lead> {
+  async findOne(id: string): Promise<any> {
     const lead = await this.leadsRepository.findOne({ 
       where: { id },
       relations: ['assignedTo']
@@ -79,10 +85,10 @@ export class LeadsService {
     if (!lead) {
       throw new NotFoundException(`Lead with ID ${id} not found`);
     }
-    return lead;
+    return this.transformLeadForClient(lead);
   }
 
-  async findOneWithNotes(id: string): Promise<Lead> {
+  async findOneWithNotes(id: string): Promise<any> {
     const lead = await this.leadsRepository.findOne({ 
       where: { id },
       relations: ['notes', 'notes.createdBy']
@@ -92,10 +98,10 @@ export class LeadsService {
       throw new NotFoundException(`Lead with ID ${id} not found`);
     }
     
-    return lead;
+    return this.transformLeadForClient(lead);
   }
 
-  async update(id: string, updateLeadDto: UpdateLeadDto): Promise<Lead> {
+  async update(id: string, updateLeadDto: UpdateLeadDto): Promise<any> {
     const lead = await this.findOne(id);
     
     // Create a clean update object
@@ -109,6 +115,8 @@ export class LeadsService {
     if (updateLeadDto.company !== undefined) updateData.company = updateLeadDto.company;
     if (updateLeadDto.status !== undefined) updateData.status = updateLeadDto.status;
     if (updateLeadDto.score !== undefined) updateData.score = updateLeadDto.score;
+    if (updateLeadDto.value !== undefined) updateData.value = updateLeadDto.value;
+    if (updateLeadDto.source !== undefined) updateData.source = updateLeadDto.source;
     if (updateLeadDto.metadata !== undefined) updateData.metadata = updateLeadDto.metadata;
     
     // Map notes to notesText
@@ -156,7 +164,8 @@ export class LeadsService {
     
     // Update the lead
     Object.assign(lead, updateData);
-    return this.leadsRepository.save(lead);
+    const updatedLead = await this.leadsRepository.save(lead);
+    return this.transformLeadForClient(updatedLead);
   }
 
   async remove(id: string): Promise<void> {
@@ -164,21 +173,24 @@ export class LeadsService {
     await this.leadsRepository.softRemove(lead);
   }
 
-  async searchLeads(searchTerm: string): Promise<Lead[]> {
-    return this.leadRepository.searchLeads(searchTerm);
+  async searchLeads(searchTerm: string): Promise<any[]> {
+    const leads = await this.leadRepository.searchLeads(searchTerm);
+    return leads.map(lead => this.transformLeadForClient(lead));
   }
 
-  async getLeadsByAssignedUser(userId: string): Promise<Lead[]> {
+  async getLeadsByAssignedUser(userId: string): Promise<any[]> {
     try {
       await this.usersService.findOne(userId);
     } catch (error) {
       throw new BadRequestException(`User with ID ${userId} not found`);
     }
-    return this.leadRepository.findByAssignedUser(userId);
+    const leads = await this.leadRepository.findByAssignedUser(userId);
+    return leads.map(lead => this.transformLeadForClient(lead));
   }
 
-  async getLeadsByDateRange(startDate: Date, endDate: Date): Promise<Lead[]> {
-    return this.leadRepository.getLeadsByDateRange(startDate, endDate);
+  async getLeadsByDateRange(startDate: Date, endDate: Date): Promise<any[]> {
+    const leads = await this.leadRepository.getLeadsByDateRange(startDate, endDate);
+    return leads.map(lead => this.transformLeadForClient(lead));
   }
 
   async getLeadCountByStatus(): Promise<any[]> {
@@ -237,5 +249,45 @@ export class LeadsService {
     // This would typically call the NotesService to remove a note
     // For now, we'll just return a mock implementation
     return;
+  }
+
+  // Helper method to transform server Lead entity to client-compatible format
+  private transformLeadForClient(lead: Lead): any {
+    if (!lead) return null;
+    
+    // Create a copy of the lead object to avoid modifying the original
+    const { firstName, lastName, assignedTo, notes, ...rest } = lead;
+    
+    // Build the transformed lead object
+    const transformedLead = {
+      ...rest,
+      name: `${firstName} ${lastName}`.trim(),
+    };
+    
+    // Handle assignedTo if it exists
+    if (assignedTo) {
+      transformedLead['assignedTo'] = {
+        id: assignedTo.id,
+        name: `${assignedTo.firstName} ${assignedTo.lastName}`.trim(),
+        email: assignedTo.email
+      };
+    }
+    
+    // Handle notes if they exist
+    if (notes && notes.length > 0) {
+      transformedLead['notes'] = notes.map(note => {
+        const { createdBy, ...noteRest } = note;
+        return {
+          ...noteRest,
+          createdBy: createdBy ? {
+            id: createdBy.id,
+            name: `${createdBy.firstName} ${createdBy.lastName}`.trim(),
+            email: createdBy.email
+          } : null
+        };
+      });
+    }
+    
+    return transformedLead;
   }
 }
