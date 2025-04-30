@@ -116,23 +116,35 @@ export class AnalyticsService {
       });
     }
     
-    // Query the database to get lead counts by month
-    const results = await this.leadsRepository.createQueryBuilder('lead')
-      .select("DATE_TRUNC('month', lead.created_at) as month")
-      .addSelect('COUNT(lead.id) as count')
-      .where('lead.created_at >= :startDate', { startDate })
-      .andWhere('lead.created_at <= :endDate', { endDate })
-      .groupBy("DATE_TRUNC('month', lead.created_at)")
-      .orderBy("DATE_TRUNC('month', lead.created_at)", 'ASC')
-      .getRawMany();
+    // Use a more database-agnostic approach instead of DATE_TRUNC
+    // Get all leads within the date range
+    const leads = await this.leadsRepository.find({
+      where: {
+        createdAt: Between(startDate, endDate)
+      },
+      select: ['createdAt']
+    });
+    
+    // Group leads by month manually
+    const leadsByMonth = {};
+    
+    leads.forEach(lead => {
+      const leadDate = new Date(lead.createdAt);
+      const monthKey = `${leadDate.getFullYear()}-${leadDate.getMonth()}`;
+      
+      if (!leadsByMonth[monthKey]) {
+        leadsByMonth[monthKey] = 0;
+      }
+      
+      leadsByMonth[monthKey]++;
+    });
     
     // Map the results to the expected format
     return months.map(month => {
-      const monthDate = new Date(month.year, month.month, 1);
-      const result = results.find(r => new Date(r.month).getMonth() === month.month);
+      const monthKey = `${month.year}-${month.month}`;
       return {
         name: month.name,
-        leads: result ? parseInt(result.count) : 0,
+        leads: leadsByMonth[monthKey] || 0,
       };
     });
   }
@@ -141,16 +153,22 @@ export class AnalyticsService {
     const statuses = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'];
     const colors = ['#3B82F6', '#8B5CF6', '#F59E0B', '#EC4899', '#D97706', '#10B981', '#EF4444'];
     
-    const results = await this.leadsRepository.createQueryBuilder('lead')
-      .select('lead.status, COUNT(lead.id) as count')
-      .groupBy('lead.status')
-      .getRawMany();
+    // Get counts for each status
+    const results = [];
+    
+    for (const status of statuses) {
+      const count = await this.leadsRepository.count({
+        where: { status }
+      });
+      
+      results.push({ status, count });
+    }
     
     return statuses.map((status, index) => {
       const result = results.find(r => r.status === status);
       return {
         name: status.charAt(0).toUpperCase() + status.slice(1),
-        value: result ? parseInt(result.count) : 0,
+        value: result ? result.count : 0,
         color: colors[index],
       };
     });

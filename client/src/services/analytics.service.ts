@@ -19,6 +19,16 @@ export interface ConversionData {
   rate: number;
 }
 
+export interface DashboardStats {
+  totalLeads: number;
+  activePipeline: number;
+  conversionRate: number;
+  avgDealSize: number;
+  leadGrowth: { name: string; leads: number }[];
+  statusDistribution: { name: string; value: number; color: string }[];
+  recentActivities: any[];
+}
+
 const AnalyticsService = {
   getLeadStats: async (): Promise<LeadStats> => {
     const response = await api.get('/analytics/leads/stats');
@@ -37,6 +47,13 @@ const AnalyticsService = {
   
   getActivityHeatmap: async (): Promise<Record<string, number>> => {
     const response = await api.get('/analytics/activity/heatmap');
+    return response.data;
+  },
+  
+  getDashboardStats: async (userId?: string): Promise<DashboardStats> => {
+    const response = await api.get('/analytics/dashboard-stats', {
+      params: userId ? { userId } : {}
+    });
     return response.data;
   }
 };
