@@ -1,5 +1,5 @@
 // server/src/modules/leads/entities/lead.entity.ts
-import { Entity, Column, ManyToOne, OneToMany } from 'typeorm';
+import { Entity, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { User } from '../../users/entities/user.entity';
 import { Note } from '../../notes/entities/note.entity';
@@ -41,8 +41,12 @@ export class Lead extends BaseEntity {
   @Column({ nullable: true })
   source: string;
 
-  @ManyToOne(() => User, { nullable: true })
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'assignedToId' })
   assignedTo: User;
+
+  @Column({ nullable: true })
+  assignedToId: string;
 
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any>;

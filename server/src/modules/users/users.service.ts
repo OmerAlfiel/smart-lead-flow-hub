@@ -17,6 +17,20 @@ export class UsersService {
     private userRepository: UserRepository,
   ) {}
 
+  async hasExistingAdmin(): Promise<boolean> {
+    const adminCount = await this.usersRepository
+      .createQueryBuilder('user')
+      .where('user.role = :role', { role: 'admin' })
+      .getCount();
+    return adminCount > 0;
+  }
+
+  async updateRole(id: string, role: string): Promise<User> {
+    const user = await this.findOne(id);
+    user.role = role;
+    return this.usersRepository.save(user);
+  }
+
   async findAll(query?: { email?: string; role?: string }): Promise<User[]> {
     const queryBuilder = this.usersRepository.createQueryBuilder('user');
     
@@ -28,7 +42,8 @@ export class UsersService {
       queryBuilder.andWhere('user.role = :role', { role: query.role });
     }
     
-    return queryBuilder.getMany();
+    const users = await queryBuilder.getMany();
+    return users;
   }
 
   async findOne(id: string): Promise<User> {
@@ -39,7 +54,7 @@ export class UsersService {
     return user;
   }
 
-  async findByEmail(email: string): Promise<User> {
+  async findByEmail(email: string): Promise<User | null> {
     return this.userRepository.findByEmail(email);
   }
 
@@ -83,15 +98,34 @@ export class UsersService {
   }
 
   async remove(id: string): Promise<void> {
-    const user = await this.findOne(id);
-    await this.usersRepository.softRemove(user);
+    await this.usersRepository.softDelete(id);
   }
 
   async searchUsers(query: string): Promise<User[]> {
-    return this.userRepository.searchUsers(query);
+    const users = await this.userRepository.searchUsers(query);
+    return users;
   }
 
   async findByRole(role: string): Promise<User[]> {
-    return this.userRepository.findByRole(role);
+    const users = await this.userRepository.findByRole(role);
+    return users;
   }
+
+
+async createInitialAdmin(setupAdminDto: any): Promise<User> {
+  const admins = await this.findByRole('admin');
+  if (admins.length > 0) {
+    throw new ConflictException('Admin user already exists');
+  }
+
+  const user = this.usersRepository.create({
+    ...setupAdminDto,
+    firstName: setupAdminDto.firstName || 'Admin',
+    lastName: setupAdminDto.lastName || 'User',
+    role: 'admin',
+    isActive: true
+  });
+  
+  return (this.usersRepository.save(user) as unknown) as Promise<User>;
+}
 }

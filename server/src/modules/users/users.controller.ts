@@ -7,6 +7,8 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { UserProfileDto } from './dto/user-profile.dto';
 import { plainToClass } from 'class-transformer';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UpdateRoleDto } from './dto/update-role.dto';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -81,6 +83,19 @@ async findAll(@Query('email') email?: string, @Query('role') role?: string) {
     
     return { success: true, message: 'Password changed successfully' };
   }
+
+  // server/src/modules/users/users.controller.ts
+  // Add this method to the UsersController class
+  @Patch(':id/role')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Update user role' })
+  @ApiResponse({ status: 200, description: 'User role updated successfully' })
+  async updateRole(@Param('id') id: string, @Body() updateRoleDto: UpdateRoleDto) {
+    return this.usersService.updateRole(id, updateRoleDto.role);
+  }
+
+
+
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a user' })
   @ApiResponse({ status: 200, description: 'User deleted successfully' })

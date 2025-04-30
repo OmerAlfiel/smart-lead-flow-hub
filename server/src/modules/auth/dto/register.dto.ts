@@ -1,4 +1,5 @@
-import { IsEmail, IsNotEmpty, MinLength } from 'class-validator';
+// server/src/modules/auth/dto/register.dto.ts
+import { IsEmail, IsNotEmpty, MinLength, IsOptional, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class RegisterDto {
@@ -19,4 +20,9 @@ export class RegisterDto {
   @IsNotEmpty()
   @MinLength(6)
   password: string;
+
+  @ApiProperty({ required: false, description: 'Invitation token for role-based registration' })
+  @IsOptional()
+  @IsString()
+  invitationToken?: string;
 }

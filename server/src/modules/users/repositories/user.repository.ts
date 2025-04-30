@@ -9,6 +9,7 @@ export class UserRepository extends Repository<User> {
   }
 
   async findByEmail(email: string): Promise<User | null> {
+    // Use findOne instead of find to ensure a single User is returned
     return this.findOne({ where: { email } });
   }
 

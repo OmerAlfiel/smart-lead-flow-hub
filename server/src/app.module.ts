@@ -21,6 +21,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { EmailTemplatesModule } from './modules/email-templates/email-templates.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
+import { InvitationsModule } from './modules/invitations/invitations.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
     CalendarModule,
     EmailTemplatesModule,
     AuditLogsModule,
+    InvitationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

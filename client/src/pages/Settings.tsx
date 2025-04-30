@@ -1,5 +1,6 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import InvitationService, { Invitation } from '@/services/invitation.service';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const Settings: React.FC = () => {
   const { toast } = useToast();
+  const { user, isAdmin } = useAuth();
   
   // Profile settings
   const [profile, setProfile] = useState({
@@ -60,7 +62,118 @@ const Settings: React.FC = () => {
     email: '',
     role: 'member'
   });
+
+  // New state variables for invitations
+  const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
+  const [newInvitation, setNewInvitation] = useState({
+    email: '',
+    role: 'agent'
+  });
+  const [isInviting, setIsInviting] = useState(false);
   
+  useEffect(() => {
+    if (isAdmin()) {
+      fetchInvitations();
+    }
+  }, []);
+  
+  const fetchInvitations = async () => {
+    try {
+      const invitations = await InvitationService.getInvitations();
+      setPendingInvitations(invitations);
+    } catch (error) {
+      console.error('Failed to fetch invitations:', error);
+      toast({
+        title: "Failed to load invitations",
+        description: "There was an error loading the invitations.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const sendInvitation = async () => {
+    if (!newInvitation.email || !newInvitation.role) {
+      toast({
+        title: "Missing information",
+        description: "Please enter an email and select a role.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsInviting(true);
+    
+    try {
+      const result = await InvitationService.createInvitation(newInvitation);
+      const invitationLink = `${window.location.origin}/signup?token=${result.token}`;
+      await navigator.clipboard.writeText(invitationLink);
+      
+      toast({
+        title: "Invitation sent!",
+        description: "The invitation link has been copied to your clipboard.",
+      });
+      
+      setNewInvitation({ email: '', role: 'agent' });
+      fetchInvitations();
+    } catch (error) {
+      toast({
+        title: "Failed to send invitation",
+        description: "There was an error sending the invitation.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsInviting(false);
+    }
+  };
+  
+  const copyInvitationLink = (token: string) => {
+    const invitationLink = `${window.location.origin}/signup?token=${token}`;
+    navigator.clipboard.writeText(invitationLink);
+    
+    toast({
+      title: "Link copied!",
+      description: "The invitation link has been copied to your clipboard.",
+    });
+  };
+  
+  const resendInvitation = async (id: string) => {
+    try {
+      await InvitationService.resendInvitation(id);
+      
+      toast({
+        title: "Invitation resent",
+        description: "The invitation has been resent successfully.",
+      });
+      
+      fetchInvitations();
+    } catch (error) {
+      toast({
+        title: "Failed to resend invitation",
+        description: "There was an error resending the invitation.",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  const deleteInvitation = async (id: string) => {
+    try {
+      await InvitationService.deleteInvitation(id);
+      
+      toast({
+        title: "Invitation deleted",
+        description: "The invitation has been deleted successfully.",
+      });
+      
+      setPendingInvitations(pendingInvitations.filter(inv => inv.id !== id));
+    } catch (error) {
+      toast({
+        title: "Failed to delete invitation",
+        description: "There was an error deleting the invitation.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Handle profile update
   const updateProfile = () => {
     toast({
@@ -142,7 +255,7 @@ const Settings: React.FC = () => {
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
-            <TabsTrigger value="team">Team</TabsTrigger>
+            <TabsTrigger value="team" disabled={!isAdmin()}>Team</TabsTrigger>
           </TabsList>
           
           {/* Profile Settings */}
@@ -509,103 +622,171 @@ const Settings: React.FC = () => {
             </Card>
           </TabsContent>
           
-          {/* Team Settings */}
-          <TabsContent value="team">
-            <Card>
-              <CardHeader>
-                <CardTitle>Team Management</CardTitle>
-                <CardDescription>
-                  Add and manage team members and their access levels.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {teamMembers.map(member => (
-                  <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                        <span className="text-lg font-semibold text-gray-600">
-                          {member.name.split(' ').map(n => n[0]).join('')}
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="font-medium">{member.name}</h4>
-                        <p className="text-sm text-muted-foreground">{member.email}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Select defaultValue={member.role}>
-                        <SelectTrigger className="w-32">
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="member">Member</SelectItem>
-                          <SelectItem value="readonly">Read Only</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      
-                      {member.id !== '1' && (
-                        <Button 
-                          variant="outline" 
-                          size="icon" 
-                          className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                          onClick={() => removeTeamMember(member.id)}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+{/* Team Settings */}
+<TabsContent value="team">
+  {isAdmin() ? (
+    <Card>
+      <CardHeader>
+        <CardTitle>Team Management</CardTitle>
+        <CardDescription>
+          Add and manage team members and their access levels.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Current Team Members */}
+        <div>
+          <h3 className="text-lg font-medium mb-4">Current Team Members</h3>
+          {teamMembers.map(member => (
+            <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg mb-2">
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                  <span className="text-lg font-semibold text-gray-600">
+                    {member.name.split(' ').map(n => n[0]).join('')}
+                  </span>
+                </div>
+                <div>
+                  <h4 className="font-medium">{member.name}</h4>
+                  <p className="text-sm text-muted-foreground">{member.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select defaultValue={member.role}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="agent">Agent</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                {member.id !== '1' && (
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                    onClick={() => removeTeamMember(member.id)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
 
-                <div className="mt-8">
-                  <h3 className="text-lg font-medium mb-4">Add New Team Member</h3>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="new-name">Name</Label>
-                      <Input 
-                        id="new-name"
-                        value={newMember.name}
-                        onChange={(e) => setNewMember({...newMember, name: e.target.value})}
-                        placeholder="John Doe"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="new-email">Email</Label>
-                      <Input 
-                        id="new-email"
-                        type="email"
-                        value={newMember.email}
-                        onChange={(e) => setNewMember({...newMember, email: e.target.value})}
-                        placeholder="john@example.com"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="new-role">Role</Label>
-                      <Select 
-                        value={newMember.role} 
-                        onValueChange={(value) => setNewMember({...newMember, role: value})}
-                      >
-                        <SelectTrigger id="new-role">
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="member">Member</SelectItem>
-                          <SelectItem value="readonly">Read Only</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+        {/* Pending Invitations */}
+        <div className="mt-8">
+          <h3 className="text-lg font-medium mb-4">Pending Invitations</h3>
+          {pendingInvitations.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No pending invitations</p>
+          ) : (
+            pendingInvitations.map(invitation => (
+              <div key={invitation.id} className="flex items-center justify-between p-4 border rounded-lg mb-2">
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
                   </div>
-                  <div className="mt-4">
-                    <Button onClick={addTeamMember}>Add Team Member</Button>
+                  <div>
+                    <h4 className="font-medium">{invitation.email}</h4>
+                    <p className="text-sm text-muted-foreground">Role: {invitation.role} • Expires: {new Date(invitation.expiresAt).toLocaleDateString()}</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => copyInvitationLink(invitation.token)}
+                  >
+                    Copy Link
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => resendInvitation(invitation.id)}
+                  >
+                    Resend
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                    onClick={() => deleteInvitation(invitation.id)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Invite New User Form */}
+        <div className="mt-8">
+          <h3 className="text-lg font-medium mb-4">Invite New Team Member</h3>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="invite-email">Email</Label>
+              <Input 
+                id="invite-email"
+                type="email"
+                value={newInvitation.email}
+                onChange={(e) => setNewInvitation({...newInvitation, email: e.target.value})}
+                placeholder="colleague@example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invite-role">Role</Label>
+              <Select 
+                value={newInvitation.role} 
+                onValueChange={(value) => setNewInvitation({...newInvitation, role: value})}
+              >
+                <SelectTrigger id="invite-role">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="agent">Agent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end">
+              <Button 
+                className="w-full"
+                onClick={sendInvitation}
+                disabled={!newInvitation.email || !newInvitation.role || isInviting}
+              >
+                {isInviting ? 'Sending...' : 'Send Invitation'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  ) : (
+    <Card>
+      <CardHeader>
+        <CardTitle>Team Management</CardTitle>
+        <CardDescription>
+          You don't have permission to access team management.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="text-muted-foreground">
+          Only administrators can manage team members and invitations. Please contact your administrator if you need access.
+        </p>
+      </CardContent>
+    </Card>
+  )}
+</TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
