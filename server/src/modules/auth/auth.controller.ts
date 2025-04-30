@@ -1,5 +1,5 @@
 // server/src/modules/auth/auth.controller.ts
-import { Controller, Post, Body, UseGuards, Request, Get, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, Get, HttpCode, HttpStatus, Query, ForbiddenException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -68,5 +68,29 @@ export class AuthController {
   @Get('profile')
   getProfile(@Request() req) {
     return req.user;
+  }
+
+  @ApiOperation({ summary: 'Check if user has permission to access a resource' })
+  @ApiResponse({ status: 200, description: 'User has permission' })
+  @ApiResponse({ status: 403, description: 'User does not have permission' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get('check-permission')
+  checkPermission(@Request() req, @Query('resource') resource: string) {
+    // Check permissions based on user role and requested resource
+    const { user } = req;
+    
+    // Handle invitations resource
+    if (resource === 'invitations') {
+      if (user.role === 'admin' || user.role === 'manager') {
+        return { permitted: true };
+      }
+      throw new ForbiddenException('You do not have permission to access invitations');
+    }
+    
+    // Add more resource checks as needed
+    
+    // Default deny for unknown resources
+    throw new ForbiddenException('Unknown resource or insufficient permissions');
   }
 }

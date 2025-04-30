@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,10 +28,56 @@ const Invitations: React.FC = () => {
   const { toast } = useToast();
   const { user } = useAuth();
 
+  // Check if user has permission to access this page
+  useEffect(() => {
+    if (user && !isAuthorized()) {
+      toast({
+        title: "Access Denied",
+        description: "You don't have permission to access this page",
+        variant: "destructive",
+      });
+      window.location.href = '/dashboard';
+    }
+  }, [user]);
+
+  // Function to check if user is authorized
+  const isAuthorized = () => {
+    return user?.role === 'admin' || user?.role === 'manager';
+  };
+
+  // Function to check if user can create specific role
+  const canCreateRole = (roleToCreate: string) => {
+    if (user?.role === 'admin') return true;
+    if (user?.role === 'manager' && roleToCreate === 'agent') return true;
+    return false;
+  };
+
   // Fetch invitations on component mount
   useEffect(() => {
-    fetchInvitations();
-  }, []);
+    const checkPermissionAndFetchData = async () => {
+      try {
+        // First, verify permissions on the server
+        await api.get('/auth/check-permission?resource=invitations');
+        
+        // If the above doesn't throw an error, user has permission
+        if (isAuthorized()) {
+          fetchInvitations();
+        }
+      } catch (error) {
+        // Server rejected the permission check
+        toast({
+          title: "Access Denied",
+          description: "You don't have permission to access this page",
+          variant: "destructive",
+        });
+        window.location.href = '/dashboard';
+      }
+    };
+    
+    if (user) {
+      checkPermissionAndFetchData();
+    }
+  }, [user]);
 
   const fetchInvitations = async () => {
     setIsLoading(true);
@@ -54,6 +100,15 @@ const Invitations: React.FC = () => {
     setIsSubmitting(true);
     
     try {
+      if (!canCreateRole(role)) {
+        toast({
+          title: "Access Denied",
+          description: "You don't have permission to create this role",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       await api.post('/invitations', { email, role });
       
       toast({
