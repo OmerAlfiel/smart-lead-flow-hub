@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import LeadCard from '@/components/leads/LeadCard';
 import LeadForm from '@/components/leads/LeadForm';
@@ -20,6 +19,7 @@ import {
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
 import { v4 as uuidv4 } from 'uuid';
+import LeadsService from '@/services/leads.service';
 
 const Leads: React.FC = () => {
   const [leads, setLeads] = useState<Lead[]>(mockLeads);
@@ -30,8 +30,32 @@ const Leads: React.FC = () => {
   const [currentLead, setCurrentLead] = useState<Lead | undefined>(undefined);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
   
   const { toast } = useToast();
+
+  // Fetch leads from API
+  useEffect(() => {
+    const fetchLeads = async () => {
+      try {
+        setIsLoading(true);
+        const data = await LeadsService.getAllLeads();
+        setLeads(data);
+        setFilteredLeads(data);
+      } catch (error) {
+        console.error('Error fetching leads:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load leads. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLeads();
+  }, []);
 
   // Handle search and filtering
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,30 +105,11 @@ const Leads: React.FC = () => {
     setIsDeleteDialogOpen(true);
   };
 
-  const confirmDeleteLead = () => {
-    const updatedLeads = leads.filter(lead => lead.id !== leadToDelete);
-    setLeads(updatedLeads);
-    setFilteredLeads(updatedLeads.filter(lead => 
-      (statusFilter === 'all' || lead.status === statusFilter) &&
-      (lead.name.toLowerCase().includes(searchTerm) ||
-       lead.email.toLowerCase().includes(searchTerm) ||
-       (lead.company && lead.company.toLowerCase().includes(searchTerm)))
-    ));
-    
-    toast({
-      title: "Lead deleted",
-      description: "The lead has been deleted successfully.",
-    });
-    
-    setIsDeleteDialogOpen(false);
-  };
-
-  const handleSaveLead = (leadData: Partial<Lead>) => {
-    if (currentLead) {
-      // Update existing lead
-      const updatedLeads = leads.map(lead => 
-        lead.id === currentLead.id ? { ...lead, ...leadData } : lead
-      );
+  const confirmDeleteLead = async () => {
+    try {
+      await LeadsService.deleteLead(leadToDelete);
+      
+      const updatedLeads = leads.filter(lead => lead.id !== leadToDelete);
       setLeads(updatedLeads);
       setFilteredLeads(updatedLeads.filter(lead => 
         (statusFilter === 'all' || lead.status === statusFilter) &&
@@ -114,41 +119,77 @@ const Leads: React.FC = () => {
       ));
       
       toast({
-        title: "Lead updated",
-        description: "The lead has been updated successfully.",
+        title: "Lead deleted",
+        description: "The lead has been deleted successfully.",
       });
-    } else {
-      // Add new lead
-      const newLead: Lead = {
-        id: uuidv4(),
-        name: leadData.name || '',
-        email: leadData.email || '',
-        phone: leadData.phone,
-        company: leadData.company,
-        status: leadData.status as LeadStatus || 'new',
-        value: leadData.value,
-        source: leadData.source,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      
-      const updatedLeads = [...leads, newLead];
-      setLeads(updatedLeads);
-      
-      // Apply current filters to the updated leads
-      const shouldInclude = 
-        (statusFilter === 'all' || newLead.status === statusFilter) &&
-        (newLead.name.toLowerCase().includes(searchTerm) ||
-         newLead.email.toLowerCase().includes(searchTerm) ||
-         (newLead.company && newLead.company.toLowerCase().includes(searchTerm)));
-      
-      if (shouldInclude) {
-        setFilteredLeads([...filteredLeads, newLead]);
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete lead. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
+  const handleSaveLead = async (leadData: Partial<Lead>) => {
+    try {
+      if (currentLead) {
+        // Update existing lead
+        const updatedLead = await LeadsService.updateLead({
+          id: currentLead.id,
+          ...leadData
+        });
+        
+        const updatedLeads = leads.map(lead => 
+          lead.id === currentLead.id ? updatedLead : lead
+        );
+        
+        setLeads(updatedLeads);
+        setFilteredLeads(updatedLeads.filter(lead => 
+          (statusFilter === 'all' || lead.status === statusFilter) &&
+          (lead.name.toLowerCase().includes(searchTerm) ||
+           lead.email.toLowerCase().includes(searchTerm) ||
+           (lead.company && lead.company.toLowerCase().includes(searchTerm)))
+        ));
+        
+        toast({
+          title: "Lead updated",
+          description: "The lead has been updated successfully.",
+        });
+      } else {
+        // Add new lead
+        const newLead = await LeadsService.createLead(leadData as Omit<Lead, 'id'>);
+        
+        const updatedLeads = [...leads, newLead];
+        setLeads(updatedLeads);
+        
+        // Apply current filters to the updated leads
+        const shouldInclude = 
+          (statusFilter === 'all' || newLead.status === statusFilter) &&
+          (newLead.name.toLowerCase().includes(searchTerm) ||
+           newLead.email.toLowerCase().includes(searchTerm) ||
+           (newLead.company && newLead.company.toLowerCase().includes(searchTerm)));
+        
+        if (shouldInclude) {
+          setFilteredLeads([...filteredLeads, newLead]);
+        }
+        
+        toast({
+          title: "Lead added",
+          description: "The lead has been added successfully.",
+        });
       }
       
+      setIsFormOpen(false);
+    } catch (error) {
+      console.error('Error saving lead:', error);
       toast({
-        title: "Lead added",
-        description: "The lead has been added successfully.",
+        title: "Error",
+        description: "Failed to save lead. Please try again.",
+        variant: "destructive",
       });
     }
   };
