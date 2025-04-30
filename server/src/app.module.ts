@@ -22,6 +22,7 @@ import { CalendarModule } from './modules/calendar/calendar.module';
 import { EmailTemplatesModule } from './modules/email-templates/email-templates.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { InvitationsModule } from './modules/invitations/invitations.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { InvitationsModule } from './modules/invitations/invitations.module';
     EmailTemplatesModule,
     AuditLogsModule,
     InvitationsModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
