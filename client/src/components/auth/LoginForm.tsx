@@ -1,43 +1,41 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/contexts/AuthContext';
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     try {
-      // This is where Firebase authentication would happen
-      // For now, we'll use mock data
-      console.log('Login attempt with:', { email, password });
+      await login(email, password);
       
-      // Mock successful login
-      setTimeout(() => {
-        toast({
-          title: "Success!",
-          description: "You've been logged in successfully.",
-        });
-        setIsLoading(false);
-        // Here we would redirect to dashboard
-      }, 1500);
+      toast({
+        title: "Success!",
+        description: "You've been logged in successfully.",
+      });
       
-    } catch (error) {
-      setIsLoading(false);
+      // Redirect to dashboard
+      navigate('/dashboard');
+    } catch (error: any) {
       toast({
         title: "Login failed",
-        description: "Please check your credentials and try again.",
+        description: error.message || "Please check your credentials and try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 

@@ -12,6 +12,7 @@ import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
 import InitialSetup from "@/components/admin/InitialSetup";
 import api from "@/services/api";
+import Invitations from "@/pages/Invitations";
 
 
 const AppRoutes = () => {
@@ -62,6 +63,7 @@ const AppRoutes = () => {
           user ? <Navigate to="/dashboard" /> : <Navigate to="/login" />
         } 
       />
+      <Route path="/invitations" element={user ? <Invitations /> : <Navigate to="/login" />} />
       
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -1,10 +1,9 @@
 // client/src/components/auth/SignupForm.tsx
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -14,11 +13,20 @@ const SignupForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState('agent'); // Default role
+  const [invitationToken, setInvitationToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const tokenFromUrl = queryParams.get('token');
   const { register } = useAuth();
+
+  useEffect(() => {
+    if (tokenFromUrl) {
+      setInvitationToken(tokenFromUrl);
+    }
+  }, [tokenFromUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +43,8 @@ const SignupForm: React.FC = () => {
     setIsLoading(true);
     
     try {
-      await register(firstName, lastName, email, password, role);
+      // Pass the invitation token instead of role
+      await register(firstName, lastName, email, password, invitationToken);
       
       toast({
         title: "Account created!",
@@ -143,17 +152,18 @@ const SignupForm: React.FC = () => {
       </div>
 
       <div>
-        <Label htmlFor="role">Role</Label>
-        <Select value={role} onValueChange={setRole}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select a role" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="agent">Agent</SelectItem>
-            <SelectItem value="manager">Manager</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-          </SelectContent>
-        </Select>
+        <Label htmlFor="invitationToken">Invitation Token</Label>
+        <div className="mt-1">
+          <Input
+            id="invitationToken"
+            name="invitationToken"
+            type="text"
+            value={invitationToken}
+            onChange={(e) => setInvitationToken(e.target.value)}
+            className="block w-full"
+            placeholder="Enter your invitation token (optional for agent role)"
+          />
+        </div>
       </div>
 
       <div>
