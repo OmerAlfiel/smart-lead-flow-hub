@@ -26,20 +26,43 @@ export interface NotificationSettingsData {
   pushReports: boolean;
 }
 
+interface GoogleConfig {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  scope: string[];
+}
+
+interface Office365Config {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  scope: string[];
+  tenantId: string;
+}
+
+interface SalesforceConfig {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  instanceUrl: string;
+  scope: string[];
+}
+
 export interface IntegrationSettingsData {
   id?: string;
   google: boolean;
-  googleConfig?: Record<string, any>;
+  googleConfig?: GoogleConfig;
   office365: boolean;
-  office365Config?: Record<string, any>;
+  office365Config?: Office365Config;
   slack: boolean;
-  slackConfig?: Record<string, any>;
+  slackConfig?: Record<string, unknown>;
   zoom: boolean;
-  zoomConfig?: Record<string, any>;
+  zoomConfig?: Record<string, unknown>;
   hubspot: boolean;
-  hubspotConfig?: Record<string, any>;
+  hubspotConfig?: Record<string, unknown>;
   salesforce: boolean;
-  salesforceConfig?: Record<string, any>;
+  salesforceConfig?: SalesforceConfig;
 }
 
 export interface AppSettingsData {
@@ -53,7 +76,7 @@ export interface AppSettingsData {
   maxUsersPerTeam: number;
   defaultUserRole: string;
   retentionPeriod: number;
-  customFields?: Record<string, any>;
+  customFields?: Record<string, string | number | boolean>;
 }
 
 const SettingsService = {
@@ -74,7 +97,7 @@ const SettingsService = {
         name: `${userData.firstName} ${userData.lastName}`,
         email: userData.email,
         // Map any other fields as needed
-        phone: userData.phone || '',
+        phone: userData.phone || userSettingsData.phone || '',
         title: userData.title || userSettingsData.title || '',
         company: userData.company || userSettingsData.company || '',
         bio: userData.bio || userSettingsData.bio || ''
@@ -92,7 +115,6 @@ const SettingsService = {
       const userId = currentUser.data.id;
       
       // Extract fields that should be updated in the user profile
-      // Only include fields that are in the UpdateUserDto
       const userProfileData: any = {};
       if (data.name) {
         // Split the name into firstName and lastName
@@ -115,21 +137,26 @@ const SettingsService = {
         await api.patch(`/users/${userId}`, userProfileData);
       }
       
-      // Extract fields for user settings
-      // Only include fields that are in the UpdateUserSettingsDto
-      const userSettingsData: any = {};
+      // Create a user settings object with the phone explicitly included
+      const userSettingsData: any = {
+        phone: data.phone,  // Explicitly include phone whether it's empty or not
+        title: data.title,
+        company: data.company,
+        bio: data.bio,
+        timezone: data.timezone,
+        language: data.language,
+        theme: data.theme
+      };
       
-      if (data.phone !== undefined) userSettingsData.phone = data.phone;
-      if (data.title !== undefined) userSettingsData.title = data.title;
-      if (data.company !== undefined) userSettingsData.company = data.company;
-      if (data.bio !== undefined) userSettingsData.bio = data.bio;
-      if (data.timezone !== undefined) userSettingsData.timezone = data.timezone;
-      if (data.language !== undefined) userSettingsData.language = data.language;
-      if (data.theme !== undefined) userSettingsData.theme = data.theme;
+      // Filter out undefined values (but keep empty strings)
+      const filteredSettings = Object.fromEntries(
+        Object.entries(userSettingsData).filter(([_, v]) => v !== undefined)
+      );
       
-      // Update user settings only if there are fields to update
-      if (Object.keys(userSettingsData).length > 0) {
-        await api.patch('/settings/user', userSettingsData);
+      // Only make the API call if there are fields to update
+      if (Object.keys(filteredSettings).length > 0) {
+        console.log("Updating user settings with:", JSON.stringify(filteredSettings));
+        await api.patch('/settings/user', filteredSettings);
       }
       
       // Return the combined updated data
@@ -232,7 +259,7 @@ const SettingsService = {
     }
   },
 
-  updateTeamMember: async (id: string, data: {role: string}): Promise<any> => {
+  updateTeamMember: async (id: string, data: {role: string}): Promise<{id: string, name: string, email: string, role: string}> => {
     try {
       const response = await api.patch(`/teams/members/${id}`, data);
       return response.data;
